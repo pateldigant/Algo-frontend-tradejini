@@ -1,6 +1,8 @@
 // src/pages/Dashboard.jsx
 import React, { useEffect, useState } from "react";
 import OptionChainTable from "../components/OptionChainTable";
+import FundsDisplay from "../components/FundsDisplay";
+import OpenOrdersTable from "../components/OpenOrdersTable"; // Import the new component
 import Card from "react-bootstrap/Card";
 import Form from "react-bootstrap/Form";
 import Tabs from "react-bootstrap/Tabs";
@@ -13,6 +15,8 @@ function Dashboard() {
   const [prevData, setPrevData] = useState(null);
   const [intervalSec, setIntervalSec] = useState(3);
   const [positions, setPositions] = useState([]);
+  const [funds, setFunds] = useState(null);
+  const [openOrders, setOpenOrders] = useState([]); // New state for open orders
   const [showConfirm, setShowConfirm] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState(null);
   const [strikeRange, setStrikeRange] = useState(10);
@@ -44,6 +48,36 @@ function Dashboard() {
       console.error("Error fetching positions:", e);
     }
   };
+  
+  const fetchFunds = async () => {
+    try {
+      const res = await fetch("http://localhost:8000/api/funds");
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+      const json = await res.json();
+      if (json.s === "ok") {
+        setFunds(json);
+      }
+    } catch (e) {
+      console.error("Error fetching funds:", e);
+    }
+  };
+
+  // New function to fetch and filter open orders
+  const fetchOpenOrders = async () => {
+    try {
+      const res = await fetch("http://localhost:8000/api/orderbook");
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+      const json = await res.json();
+      if (json.s === "ok" && Array.isArray(json.d)) {
+        // Filter for orders that are pending
+        const pendingStatuses = ["open", "trigger_pending"];
+        const filteredOrders = json.d.filter(order => pendingStatuses.includes(order.status?.toLowerCase()));
+        setOpenOrders(filteredOrders);
+      }
+    } catch (e) {
+      console.error("Error fetching open orders:", e);
+    }
+  };
 
   const handleSquareOff = async () => {
     if (!selectedPosition) return;
@@ -53,13 +87,16 @@ function Dashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ symId: selectedPosition.symId }),
       });
-      alert(`Square-off request sent for ${selectedPosition.sym?.dispSymbol || selectedPosition.symId}.`);
+      alert(`Square-off request sent for ${selectedPosition.symId}.`);
     } catch (err) {
       alert("Error sending square-off request.");
     } finally {
       setShowConfirm(false);
       setSelectedPosition(null);
-      setTimeout(fetchPositions, 500);
+      setTimeout(() => {
+        fetchPositions();
+        fetchOpenOrders(); // Refresh open orders after squaring off
+      }, 500);
     }
   };
 
@@ -67,29 +104,35 @@ function Dashboard() {
     const initialFetch = () => {
       fetchSnapshot();
       fetchPositions();
+      fetchFunds();
+      fetchOpenOrders(); // Fetch open orders on initial load
     };
     initialFetch();
     
     const id1 = setInterval(fetchSnapshot, intervalSec * 1000);
     const id2 = setInterval(fetchPositions, intervalSec * 1000);
+    const id3 = setInterval(fetchFunds, intervalSec * 1000 * 2);
+    const id4 = setInterval(fetchOpenOrders, intervalSec * 1000); // Refresh open orders periodically
+
     return () => {
       clearInterval(id1);
       clearInterval(id2);
+      clearInterval(id3);
+      clearInterval(id4);
     };
   }, [intervalSec]);
 
-  // Helper function to determine the correct average price to display
   const getDisplayAvgPrice = (p) => {
     const netQty = p?.netQty ?? 0;
     const isIntraday = (p?.buyQty ?? 0) > 0 || (p?.sellQty ?? 0) > 0;
     
-    if (netQty > 0) { // Long position
+    if (netQty > 0) {
       return isIntraday ? p.buyAvgPrice : p.netAvgPrice;
     }
-    if (netQty < 0) { // Short position
+    if (netQty < 0) {
       return isIntraday ? p.sellAvgPrice : p.netAvgPrice;
     }
-    return p.buyAvgPrice; // Default for closed positions
+    return p.buyAvgPrice;
   };
 
   const realized = positions.reduce((sum, p) => sum + (p?.realizedPnl ?? 0), 0);
@@ -98,6 +141,7 @@ function Dashboard() {
 
   return (
     <>
+      <FundsDisplay funds={funds} />
       <Tabs defaultActiveKey="positions" id="main-tabs" className="mb-4">
         <Tab eventKey="options" title="Live Option Chain">
           <div className="row">
@@ -153,7 +197,6 @@ function Dashboard() {
                       <th>Symbol</th>
                       <th>Qty</th>
                       <th>LTP</th>
-                      {/* **FIX**: Changed header to 'Avg Price' */}
                       <th>Avg Price</th>
                       <th>Unrealized PnL</th>
                       <th>Realized PnL</th>
@@ -166,7 +209,6 @@ function Dashboard() {
                         <td className="fw-semibold">{p.symId}</td>
                         <td>{p.netQty}</td>
                         <td>{p.ltp ?? "-"}</td>
-                        {/* **FIX**: Display the correct average price */}
                         <td>{getDisplayAvgPrice(p)?.toFixed(2) ?? "-"}</td>
                         <td className={p.unrealizedPnlLive >= 0 ? "text-success" : "text-danger"}>
                           {p.ltp != null ? p.unrealizedPnlLive?.toFixed(2) : "-"}
@@ -192,6 +234,15 @@ function Dashboard() {
                   </tbody>
                 </table>
               </div>
+            </Card.Body>
+          </Card>
+        </Tab>
+        
+        <Tab eventKey="open-orders" title={`Open Orders (${openOrders.length})`}>
+          <Card className="shadow-sm">
+            <Card.Body>
+              <Card.Title className="fw-semibold text-center mb-3">Pending Orders</Card.Title>
+              <OpenOrdersTable orders={openOrders} />
             </Card.Body>
           </Card>
         </Tab>
