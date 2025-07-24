@@ -17,9 +17,38 @@ function Dashboard() {
   const [positions, setPositions] = useState([]);
   const [funds, setFunds] = useState(null);
   const [openOrders, setOpenOrders] = useState([]);
+  const [strikeRange, setStrikeRange] = useState(10);
+
+  // State for single square-off modal
   const [showConfirm, setShowConfirm] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState(null);
-  const [strikeRange, setStrikeRange] = useState(10);
+
+  // State and logic for multi-select square-off
+  const [selectedPositions, setSelectedPositions] = useState(new Set());
+  const [showBulkConfirm, setShowBulkConfirm] = useState(false);
+
+  const handleSelectionChange = (symId) => {
+    setSelectedPositions(prev => {
+      const newSelection = new Set(prev);
+      if (newSelection.has(symId)) {
+        newSelection.delete(symId);
+      } else {
+        newSelection.add(symId);
+      }
+      return newSelection;
+    });
+  };
+
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      const allOpenPositionIds = positions
+        .filter(p => p.netQty !== 0)
+        .map(p => p.symId);
+      setSelectedPositions(new Set(allOpenPositionIds));
+    } else {
+      setSelectedPositions(new Set());
+    }
+  };
 
   const fetchSnapshot = async () => {
     try {
@@ -86,18 +115,44 @@ function Dashboard() {
         body: JSON.stringify({ symId: selectedPosition.symId }),
       });
       const result = await response.json();
-      
       if (response.ok) {
         alert(result.msg);
       } else {
         alert(`Error: ${result.detail || "Unknown error"}`);
       }
-
     } catch (err) {
       alert("Failed to send square-off request.");
     } finally {
       setShowConfirm(false);
       setSelectedPosition(null);
+      setTimeout(() => {
+        fetchPositions();
+        fetchOpenOrders();
+      }, 1000);
+    }
+  };
+
+  const handleBulkSquareOff = async () => {
+    if (selectedPositions.size === 0) return;
+    try {
+      const response = await fetch("http://localhost:8000/api/squareoff-multiple", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ symIds: Array.from(selectedPositions) }),
+      });
+      const result = await response.json();
+      
+      if (response.ok) {
+        alert(result.details.join('\\n'));
+      } else {
+        alert(`Error: ${result.detail || "Unknown error"}`);
+      }
+
+    } catch (err) {
+      alert("Failed to send bulk square-off request.");
+    } finally {
+      setShowBulkConfirm(false);
+      setSelectedPositions(new Set());
       setTimeout(() => {
         fetchPositions();
         fetchOpenOrders();
@@ -143,6 +198,7 @@ function Dashboard() {
   const realized = positions.reduce((sum, p) => sum + (p?.realizedPnl ?? 0), 0);
   const unrealized = positions.reduce((sum, p) => sum + (p?.unrealizedPnlLive ?? 0), 0);
   const total = realized + unrealized;
+  const openPositions = positions.filter(p => p.netQty !== 0);
 
   return (
     <>
@@ -190,6 +246,15 @@ function Dashboard() {
           <Card className="shadow-sm">
             <Card.Body>
               <Card.Title className="fw-semibold text-center mb-3">Current Positions</Card.Title>
+              <div className="d-flex justify-content-end mb-3">
+                <Button 
+                  variant="danger" 
+                  disabled={selectedPositions.size === 0}
+                  onClick={() => setShowBulkConfirm(true)}
+                >
+                  Square Off Selected ({selectedPositions.size})
+                </Button>
+              </div>
               <div className="row text-center mb-3">
                 <div className="col"><strong>Realized PnL:</strong> <span className={realized >= 0 ? "text-success" : "text-danger"}>{realized.toFixed(2)}</span></div>
                 <div className="col"><strong>Unrealized PnL:</strong> <span className={unrealized >= 0 ? "text-success" : "text-danger"}>{unrealized.toFixed(2)}</span></div>
@@ -199,6 +264,13 @@ function Dashboard() {
                 <table className="table table-bordered text-center align-middle">
                   <thead className="table-light">
                     <tr>
+                      <th>
+                        <Form.Check 
+                          type="checkbox"
+                          onChange={handleSelectAll}
+                          checked={openPositions.length > 0 && selectedPositions.size === openPositions.length}
+                        />
+                      </th>
                       <th>Symbol</th>
                       <th>Qty</th>
                       <th>LTP</th>
@@ -211,6 +283,14 @@ function Dashboard() {
                   <tbody>
                     {positions.length > 0 ? positions.map((p, idx) => (
                       <tr key={idx} className={p.isClosedToday ? "text-muted" : ""}>
+                        <td>
+                          <Form.Check 
+                            type="checkbox"
+                            disabled={p.netQty === 0}
+                            checked={selectedPositions.has(p.symId)}
+                            onChange={() => handleSelectionChange(p.symId)}
+                          />
+                        </td>
                         <td className="fw-semibold">{p.symId}</td>
                         <td>{p.netQty}</td>
                         <td>{p.ltp ?? "-"}</td>
@@ -234,7 +314,7 @@ function Dashboard() {
                         </td>
                       </tr>
                     )) : (
-                      <tr><td colSpan="7" className="text-muted">No open positions.</td></tr>
+                      <tr><td colSpan="8" className="text-muted">No open positions.</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -263,6 +343,22 @@ function Dashboard() {
         <Modal.Footer>
           <Button variant="secondary" onClick={() => setShowConfirm(false)}>Cancel</Button>
           <Button variant="danger" onClick={handleSquareOff}>Yes, Square Off</Button>
+        </Modal.Footer>
+      </Modal>
+
+      <Modal show={showBulkConfirm} onHide={() => setShowBulkConfirm(false)} centered size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>Confirm Bulk Square Off</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p>Are you sure you want to square off the following <strong>{selectedPositions.size}</strong> position(s)?</p>
+          <ul>
+            {Array.from(selectedPositions).map(symId => <li key={symId}>{symId}</li>)}
+          </ul>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowBulkConfirm(false)}>Cancel</Button>
+          <Button variant="danger" onClick={handleBulkSquareOff}>Yes, Square Off All</Button>
         </Modal.Footer>
       </Modal>
     </>
