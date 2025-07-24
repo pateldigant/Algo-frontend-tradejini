@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import OptionChainTable from "../components/OptionChainTable";
 import FundsDisplay from "../components/FundsDisplay";
-import OpenOrdersTable from "../components/OpenOrdersTable"; // Import the new component
+import OpenOrdersTable from "../components/OpenOrdersTable";
 import Card from "react-bootstrap/Card";
 import Form from "react-bootstrap/Form";
 import Tabs from "react-bootstrap/Tabs";
@@ -16,7 +16,7 @@ function Dashboard() {
   const [intervalSec, setIntervalSec] = useState(3);
   const [positions, setPositions] = useState([]);
   const [funds, setFunds] = useState(null);
-  const [openOrders, setOpenOrders] = useState([]); // New state for open orders
+  const [openOrders, setOpenOrders] = useState([]);
   const [showConfirm, setShowConfirm] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState(null);
   const [strikeRange, setStrikeRange] = useState(10);
@@ -62,14 +62,12 @@ function Dashboard() {
     }
   };
 
-  // New function to fetch and filter open orders
   const fetchOpenOrders = async () => {
     try {
       const res = await fetch("http://localhost:8000/api/orderbook");
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const json = await res.json();
       if (json.s === "ok" && Array.isArray(json.d)) {
-        // Filter for orders that are pending
         const pendingStatuses = ["open", "trigger_pending"];
         const filteredOrders = json.d.filter(order => pendingStatuses.includes(order.status?.toLowerCase()));
         setOpenOrders(filteredOrders);
@@ -82,21 +80,28 @@ function Dashboard() {
   const handleSquareOff = async () => {
     if (!selectedPosition) return;
     try {
-      await fetch("http://localhost:8000/api/squareoff", {
+      const response = await fetch("http://localhost:8000/api/squareoff", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ symId: selectedPosition.symId }),
       });
-      alert(`Square-off request sent for ${selectedPosition.symId}.`);
+      const result = await response.json();
+      
+      if (response.ok) {
+        alert(result.msg);
+      } else {
+        alert(`Error: ${result.detail || "Unknown error"}`);
+      }
+
     } catch (err) {
-      alert("Error sending square-off request.");
+      alert("Failed to send square-off request.");
     } finally {
       setShowConfirm(false);
       setSelectedPosition(null);
       setTimeout(() => {
         fetchPositions();
-        fetchOpenOrders(); // Refresh open orders after squaring off
-      }, 500);
+        fetchOpenOrders();
+      }, 1000);
     }
   };
 
@@ -105,14 +110,14 @@ function Dashboard() {
       fetchSnapshot();
       fetchPositions();
       fetchFunds();
-      fetchOpenOrders(); // Fetch open orders on initial load
+      fetchOpenOrders();
     };
     initialFetch();
     
     const id1 = setInterval(fetchSnapshot, intervalSec * 1000);
     const id2 = setInterval(fetchPositions, intervalSec * 1000);
     const id3 = setInterval(fetchFunds, intervalSec * 1000 * 2);
-    const id4 = setInterval(fetchOpenOrders, intervalSec * 1000); // Refresh open orders periodically
+    const id4 = setInterval(fetchOpenOrders, intervalSec * 1000);
 
     return () => {
       clearInterval(id1);
