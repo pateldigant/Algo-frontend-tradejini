@@ -9,6 +9,7 @@ import Tabs from "react-bootstrap/Tabs";
 import Tab from "react-bootstrap/Tab";
 import Button from "react-bootstrap/Button";
 import Modal from "react-bootstrap/Modal";
+import { Alert } from "react-bootstrap";
 
 function Dashboard() {
   const [data, setData] = useState(null);
@@ -26,6 +27,9 @@ function Dashboard() {
   // State and logic for multi-select square-off
   const [selectedPositions, setSelectedPositions] = useState(new Set());
   const [showBulkConfirm, setShowBulkConfirm] = useState(false);
+
+  // State for the "Square Off All" confirmation modal
+  const [showLiquidateConfirm, setShowLiquidateConfirm] = useState(false);
 
   const handleSelectionChange = (symId) => {
     setSelectedPositions(prev => {
@@ -160,6 +164,31 @@ function Dashboard() {
     }
   };
 
+  const handleLiquidatePortfolio = async () => {
+    try {
+      const response = await fetch("http://localhost:8000/api/liquidate-portfolio", {
+        method: "POST",
+      });
+      const result = await response.json();
+      
+      if (response.ok) {
+        alert(`Liquidation Result:\\n${result.details}`);
+      } else {
+        alert(`Error: ${result.detail || "Unknown error"}`);
+      }
+
+    } catch (err) {
+      alert("Failed to send liquidate portfolio request.");
+    } finally {
+      setShowLiquidateConfirm(false);
+      setTimeout(() => {
+        fetchPositions();
+        fetchOpenOrders();
+      }, 1000);
+    }
+  };
+
+
   useEffect(() => {
     const initialFetch = () => {
       fetchSnapshot();
@@ -253,6 +282,13 @@ function Dashboard() {
                   onClick={() => setShowBulkConfirm(true)}
                 >
                   Square Off Selected ({selectedPositions.size})
+                </Button>
+                <Button 
+                  variant="outline-danger"
+                  disabled={openPositions.length === 0 && openOrders.length === 0}
+                  onClick={() => setShowLiquidateConfirm(true)}
+                >
+                  Square Off All
                 </Button>
               </div>
               <div className="row text-center mb-3">
@@ -359,6 +395,28 @@ function Dashboard() {
         <Modal.Footer>
           <Button variant="secondary" onClick={() => setShowBulkConfirm(false)}>Cancel</Button>
           <Button variant="danger" onClick={handleBulkSquareOff}>Yes, Square Off All</Button>
+        </Modal.Footer>
+      </Modal>
+
+      <Modal show={showLiquidateConfirm} onHide={() => setShowLiquidateConfirm(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title className="text-danger">Confirm Portfolio Liquidation</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Alert variant="danger">
+            <Alert.Heading>Warning!</Alert.Heading>
+            <p>
+              This will attempt to cancel **all open orders** and then **square off all open positions** (shorts first, then longs) at market price.
+            </p>
+            <hr />
+            <p className="mb-0">
+              This action is irreversible. Are you sure you want to proceed?
+            </p>
+          </Alert>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowLiquidateConfirm(false)}>Cancel</Button>
+          <Button variant="danger" onClick={handleLiquidatePortfolio}>Yes, Square Off All</Button>
         </Modal.Footer>
       </Modal>
     </>
