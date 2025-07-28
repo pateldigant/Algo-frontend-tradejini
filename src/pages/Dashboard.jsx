@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import OptionChainTable from "../components/OptionChainTable";
 import FundsDisplay from "../components/FundsDisplay";
 import OpenOrdersTable from "../components/OpenOrdersTable";
+import ToastNotification from "../components/ToastNotification";
 import Card from "react-bootstrap/Card";
 import Form from "react-bootstrap/Form";
 import Tabs from "react-bootstrap/Tabs";
@@ -20,6 +21,8 @@ function Dashboard() {
   const [openOrders, setOpenOrders] = useState([]);
   const [strikeRange, setStrikeRange] = useState(10);
   const [orderLots, setOrderLots] = useState(1);
+  
+  // Modals
   const [showOrderConfirm, setShowOrderConfirm] = useState(false);
   const [currentOrder, setCurrentOrder] = useState(null);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -28,6 +31,17 @@ function Dashboard() {
   const [showBulkConfirm, setShowBulkConfirm] = useState(false);
   const [showLiquidateConfirm, setShowLiquidateConfirm] = useState(false);
 
+  // State and handler for toast notifications
+  const [notifications, setNotifications] = useState([]);
+
+  const addToast = (message, type = 'info') => {
+    const id = Date.now();
+    setNotifications(prev => [...prev, { id, message, type }]);
+  };
+
+  const removeToast = (id) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  };
 
   const handleSelectionChange = (symId) => {
     setSelectedPositions(prev => {
@@ -113,12 +127,12 @@ function Dashboard() {
       });
       const result = await response.json();
       if (response.ok) {
-        alert(result.msg);
+        addToast(result.msg, 'success');
       } else {
-        alert(`Error: ${result.detail || "Unknown error"}`);
+        addToast(`Error: ${result.detail || "Unknown error"}`, 'error');
       }
     } catch (err) {
-      alert("Failed to send square-off request.");
+      addToast("Failed to send square-off request.", 'error');
     } finally {
       setShowConfirm(false);
       setSelectedPosition(null);
@@ -140,13 +154,13 @@ function Dashboard() {
       const result = await response.json();
       
       if (response.ok) {
-        alert(result.details.join('\\n'));
+        addToast(result.details.join(', '), 'success');
       } else {
-        alert(`Error: ${result.detail || "Unknown error"}`);
+        addToast(`Error: ${result.detail || "Unknown error"}`, 'error');
       }
 
     } catch (err) {
-      alert("Failed to send bulk square-off request.");
+      addToast("Failed to send bulk square-off request.", 'error');
     } finally {
       setShowBulkConfirm(false);
       setSelectedPositions(new Set());
@@ -165,13 +179,13 @@ function Dashboard() {
       const result = await response.json();
       
       if (response.ok) {
-        alert(`Liquidation Result:\\n${result.details}`);
+        addToast(result.details, 'success');
       } else {
-        alert(`Error: ${result.detail || "Unknown error"}`);
+        addToast(`Error: ${result.detail || "Unknown error"}`, 'error');
       }
 
     } catch (err) {
-      alert("Failed to send liquidate portfolio request.");
+      addToast("Failed to send liquidate portfolio request.", 'error');
     } finally {
       setShowLiquidateConfirm(false);
       setTimeout(() => {
@@ -191,7 +205,6 @@ function Dashboard() {
     try {
       const orderDetails = {
         symId: currentOrder.symId,
-        // **FIX**: Use the correct key 'lot'
         qty: orderLots * currentOrder.lot,
         side: currentOrder.side,
       };
@@ -202,12 +215,12 @@ function Dashboard() {
       });
       const result = await response.json();
       if (response.ok) {
-        alert(result.msg);
+        addToast(result.msg, 'success');
       } else {
-        alert(`Error: ${result.detail || "Unknown error"}`);
+        addToast(`Error: ${result.detail || "Unknown error"}`, 'error');
       }
     } catch (err) {
-      alert("Failed to place order.");
+      addToast("Failed to place order.", 'error');
     } finally {
       setShowOrderConfirm(false);
       setCurrentOrder(null);
@@ -261,6 +274,16 @@ function Dashboard() {
 
   return (
     <>
+    <div className="toast-container">
+        {notifications.map(n => (
+          <ToastNotification 
+            key={n.id} 
+            message={n.message} 
+            type={n.type} 
+            onDismiss={() => removeToast(n.id)}
+          />
+        ))}
+      </div>
       <FundsDisplay funds={funds} />
       <Tabs defaultActiveKey="positions" id="main-tabs" className="mb-4">
         <Tab eventKey="options" title="Live Option Chain">
