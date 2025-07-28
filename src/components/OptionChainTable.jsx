@@ -1,8 +1,9 @@
 // src/components/OptionChainTable.jsx
 import React, { useMemo } from "react";
 import Table from "react-bootstrap/Table";
+import Button from "react-bootstrap/Button";
 
-function OptionChainTable({ optionChain, spotPrice, atmStrike, prevOptionChain, strikeRange }) {
+function OptionChainTable({ optionChain, spotPrice, atmStrike, prevOptionChain, strikeRange, onPlaceOrder }) {
 
   const prevLtpMap = useMemo(() => {
     if (!prevOptionChain) return new Map();
@@ -31,6 +32,26 @@ function OptionChainTable({ optionChain, spotPrice, atmStrike, prevOptionChain, 
     return optionChain.filter(row => row.strike >= lowerBound && row.strike <= upperBound);
   }, [optionChain, atmStrike, strikeRange]);
 
+  // **NEW**: Component for the Buy/Sell buttons in each cell
+  const TradeCell = ({ optionData, side }) => {
+    const ltp = optionData?.ltp;
+    if (!optionData || !optionData.symId) {
+      return <td>-</td>;
+    }
+
+    return (
+      <td className={getLtpClass(ltp, optionData.strike, side)}>
+        <div className="d-flex justify-content-between align-items-center">
+          <span>{ltp ?? "-"}</span>
+          <div>
+            <Button size="sm" variant="outline-primary" className="me-1" onClick={() => onPlaceOrder({ ...optionData, side: 'BUY' })}>B</Button>
+            <Button size="sm" variant="outline-danger" onClick={() => onPlaceOrder({ ...optionData, side: 'SELL' })}>S</Button>
+          </div>
+        </div>
+      </td>
+    );
+  };
+
   return (
     <div className="table-responsive">
       <div className="d-flex justify-content-around mb-2 fw-semibold fs-5">
@@ -41,9 +62,9 @@ function OptionChainTable({ optionChain, spotPrice, atmStrike, prevOptionChain, 
         <thead className="table-dark">
           <tr>
             <th>Call OI</th>
-            <th>Call LTP</th>
+            <th>Call LTP / Trade</th>
             <th className="table-primary">Strike</th>
-            <th>Put LTP</th>
+            <th>Put LTP / Trade</th>
             <th>Put OI</th>
           </tr>
         </thead>
@@ -51,9 +72,9 @@ function OptionChainTable({ optionChain, spotPrice, atmStrike, prevOptionChain, 
           {filteredChain.map((row) => (
             <tr key={row.strike} className={row.strike === atmStrike ? "table-info" : ""}>
               <td>{row.CE?.OI ?? "-"}</td>
-              <td className={getLtpClass(row.CE?.ltp, row.strike, "CE")}>{row.CE?.ltp ?? "-"}</td>
+              <TradeCell optionData={{ ...row.CE, strike: row.strike }} side="CE" />
               <td className="fw-bold">{row.strike}</td>
-              <td className={getLtpClass(row.PE?.ltp, row.strike, "PE")}>{row.PE?.ltp ?? "-"}</td>
+              <TradeCell optionData={{ ...row.PE, strike: row.strike }} side="PE" />
               <td>{row.PE?.OI ?? "-"}</td>
             </tr>
           ))}

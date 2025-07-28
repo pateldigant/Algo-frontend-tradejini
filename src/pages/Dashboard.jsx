@@ -19,35 +19,28 @@ function Dashboard() {
   const [funds, setFunds] = useState(null);
   const [openOrders, setOpenOrders] = useState([]);
   const [strikeRange, setStrikeRange] = useState(10);
-
-  // State for single square-off modal
+  const [orderLots, setOrderLots] = useState(1);
+  const [showOrderConfirm, setShowOrderConfirm] = useState(false);
+  const [currentOrder, setCurrentOrder] = useState(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState(null);
-
-  // State and logic for multi-select square-off
   const [selectedPositions, setSelectedPositions] = useState(new Set());
   const [showBulkConfirm, setShowBulkConfirm] = useState(false);
-
-  // State for the "Square Off All" confirmation modal
   const [showLiquidateConfirm, setShowLiquidateConfirm] = useState(false);
+
 
   const handleSelectionChange = (symId) => {
     setSelectedPositions(prev => {
       const newSelection = new Set(prev);
-      if (newSelection.has(symId)) {
-        newSelection.delete(symId);
-      } else {
-        newSelection.add(symId);
-      }
+      if (newSelection.has(symId)) { newSelection.delete(symId); } 
+      else { newSelection.add(symId); }
       return newSelection;
     });
   };
 
   const handleSelectAll = (e) => {
     if (e.target.checked) {
-      const allOpenPositionIds = positions
-        .filter(p => p.netQty !== 0)
-        .map(p => p.symId);
+      const allOpenPositionIds = positions.filter(p => p.netQty !== 0).map(p => p.symId);
       setSelectedPositions(new Set(allOpenPositionIds));
     } else {
       setSelectedPositions(new Set());
@@ -188,6 +181,43 @@ function Dashboard() {
     }
   };
 
+   const handleInitiateOrder = (orderData) => {
+    setCurrentOrder(orderData);
+    setShowOrderConfirm(true);
+  };
+
+  const handleConfirmOrder = async () => {
+    if (!currentOrder) return;
+    try {
+      const orderDetails = {
+        symId: currentOrder.symId,
+        // **FIX**: Use the correct key 'lot'
+        qty: orderLots * currentOrder.lot,
+        side: currentOrder.side,
+      };
+      const response = await fetch("http://localhost:8000/api/place-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(orderDetails),
+      });
+      const result = await response.json();
+      if (response.ok) {
+        alert(result.msg);
+      } else {
+        alert(`Error: ${result.detail || "Unknown error"}`);
+      }
+    } catch (err) {
+      alert("Failed to place order.");
+    } finally {
+      setShowOrderConfirm(false);
+      setCurrentOrder(null);
+      setTimeout(() => {
+        fetchPositions();
+        fetchOpenOrders();
+      }, 500);
+    }
+  };
+
 
   useEffect(() => {
     const initialFetch = () => {
@@ -253,6 +283,20 @@ function Dashboard() {
                 </Card.Body>
               </Card>
             </div>
+            {/* **NEW**: Card for Lot Size Input */}
+            <div className="col-md-4 mb-4">
+              <Card className="shadow-sm h-100">
+                <Card.Body>
+                  <Card.Title className="mb-3 fw-semibold">Trade Lots</Card.Title>
+                  <Form.Control 
+                    type="number" 
+                    value={orderLots}
+                    onChange={(e) => setOrderLots(Number(e.target.value))}
+                    min="1"
+                  />
+                </Card.Body>
+              </Card>
+            </div>
           </div>
           <Card className="shadow-sm">
             <Card.Body>
@@ -263,6 +307,7 @@ function Dashboard() {
                   atmStrike={data.atm_strike}
                   prevOptionChain={prevData?.option_chain}
                   strikeRange={strikeRange}
+                  onPlaceOrder={handleInitiateOrder} // Pass the handler
                 />
               ) : (
                 <div className="text-center text-muted p-5">Loading option chain data...</div>
@@ -417,6 +462,26 @@ function Dashboard() {
         <Modal.Footer>
           <Button variant="secondary" onClick={() => setShowLiquidateConfirm(false)}>Cancel</Button>
           <Button variant="danger" onClick={handleLiquidatePortfolio}>Yes, Square Off All</Button>
+        </Modal.Footer>
+      </Modal>
+
+      <Modal show={showOrderConfirm} onHide={() => setShowOrderConfirm(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Confirm Order</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          Are you sure you want to place the following market order?
+          <div className="mt-3 p-3 bg-light rounded">
+            <strong>Side:</strong> <span className={currentOrder?.side === 'BUY' ? 'text-success' : 'text-danger'}>{currentOrder?.side}</span><br />
+            <strong>Lots:</strong> {orderLots}<br />
+            {/* **FIX**: Use the correct key 'lot' */}
+            <strong>Quantity:</strong> {orderLots * currentOrder?.lot}<br />
+            <strong>Instrument:</strong> {currentOrder?.symId}
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowOrderConfirm(false)}>Cancel</Button>
+          <Button variant="primary" onClick={handleConfirmOrder}>Confirm</Button>
         </Modal.Footer>
       </Modal>
     </>
