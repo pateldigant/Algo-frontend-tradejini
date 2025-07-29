@@ -1,0 +1,15 @@
+/* src/components/Basket.css */
+.basket-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 500px;
+  max-width: 90vw;
+  z-index: 1050;
+  border: 1px solid #dee2e6;
+}
+
+.basket-list {
+  max-height: 200px;
+  overflow-y: auto;
+}

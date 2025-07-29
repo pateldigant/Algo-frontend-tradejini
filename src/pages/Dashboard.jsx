@@ -4,13 +4,14 @@ import OptionChainTable from "../components/OptionChainTable";
 import FundsDisplay from "../components/FundsDisplay";
 import OpenOrdersTable from "../components/OpenOrdersTable";
 import ToastNotification from "../components/ToastNotification";
+import Basket from "../components/Basket";
 import Card from "react-bootstrap/Card";
 import Form from "react-bootstrap/Form";
 import Tabs from "react-bootstrap/Tabs";
 import Tab from "react-bootstrap/Tab";
 import Button from "react-bootstrap/Button";
 import Modal from "react-bootstrap/Modal";
-import { Alert } from "react-bootstrap";
+import { Alert, ListGroup } from "react-bootstrap"; // **FIX**: Added ListGroup to the import
 
 function Dashboard() {
   const [data, setData] = useState(null);
@@ -21,17 +22,22 @@ function Dashboard() {
   const [openOrders, setOpenOrders] = useState([]);
   const [strikeRange, setStrikeRange] = useState(10);
   const [orderLots, setOrderLots] = useState(1);
-  
+
   // Modals
-  const [showOrderConfirm, setShowOrderConfirm] = useState(false);
-  const [currentOrder, setCurrentOrder] = useState(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState(null);
   const [selectedPositions, setSelectedPositions] = useState(new Set());
   const [showBulkConfirm, setShowBulkConfirm] = useState(false);
   const [showLiquidateConfirm, setShowLiquidateConfirm] = useState(false);
+  const [showOrderConfirm, setShowOrderConfirm] = useState(false);
+  const [currentOrder, setCurrentOrder] = useState(null);
+  
+  // Basket
+  const [isBasketMode, setIsBasketMode] = useState(false);
+  const [basket, setBasket] = useState([]);
+  const [showBasketConfirm, setShowBasketConfirm] = useState(false);
 
-  // State and handler for toast notifications
+  // Notifications
   const [notifications, setNotifications] = useState([]);
 
   const addToast = (message, type = 'info') => {
@@ -136,10 +142,7 @@ function Dashboard() {
     } finally {
       setShowConfirm(false);
       setSelectedPosition(null);
-      setTimeout(() => {
-        fetchPositions();
-        fetchOpenOrders();
-      }, 1000);
+      setTimeout(() => { fetchPositions(); fetchOpenOrders(); }, 1000);
     }
   };
 
@@ -158,46 +161,45 @@ function Dashboard() {
       } else {
         addToast(`Error: ${result.detail || "Unknown error"}`, 'error');
       }
-
     } catch (err) {
       addToast("Failed to send bulk square-off request.", 'error');
     } finally {
       setShowBulkConfirm(false);
       setSelectedPositions(new Set());
-      setTimeout(() => {
-        fetchPositions();
-        fetchOpenOrders();
-      }, 1000);
+      setTimeout(() => { fetchPositions(); fetchOpenOrders(); }, 1000);
     }
   };
 
   const handleLiquidatePortfolio = async () => {
     try {
-      const response = await fetch("http://localhost:8000/api/liquidate-portfolio", {
-        method: "POST",
-      });
+      const response = await fetch("http://localhost:8000/api/liquidate-portfolio", { method: "POST" });
       const result = await response.json();
-      
       if (response.ok) {
         addToast(result.details, 'success');
       } else {
         addToast(`Error: ${result.detail || "Unknown error"}`, 'error');
       }
-
     } catch (err) {
       addToast("Failed to send liquidate portfolio request.", 'error');
     } finally {
       setShowLiquidateConfirm(false);
-      setTimeout(() => {
-        fetchPositions();
-        fetchOpenOrders();
-      }, 1000);
+      setTimeout(() => { fetchPositions(); fetchOpenOrders(); }, 1000);
     }
   };
 
-   const handleInitiateOrder = (orderData) => {
-    setCurrentOrder(orderData);
-    setShowOrderConfirm(true);
+  const handleInitiateOrder = (orderData) => {
+    if (isBasketMode) {
+      const newBasketItem = {
+        ...orderData,
+        lots: orderLots,
+        quantity: orderLots * orderData.lot,
+      };
+      setBasket(prev => [...prev, newBasketItem]);
+      addToast(`${orderData.symId} added to basket.`, 'success');
+    } else {
+      setCurrentOrder(orderData);
+      setShowOrderConfirm(true);
+    }
   };
 
   const handleConfirmOrder = async () => {
@@ -224,13 +226,36 @@ function Dashboard() {
     } finally {
       setShowOrderConfirm(false);
       setCurrentOrder(null);
+      setTimeout(() => { fetchPositions(); fetchOpenOrders(); }, 500);
+    }
+  };
+  
+  const handleExecuteBasket = async () => {
+    if (basket.length === 0) return;
+    try {
+      const response = await fetch("http://localhost:8000/api/place-basket-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orders: basket }),
+      });
+      const result = await response.json();
+      if (response.ok) {
+        addToast(result.msg, 'success');
+        setBasket([]); // Clear the basket on success
+      } else {
+        addToast(`Error: ${result.detail || "Unknown error"}`, 'error');
+      }
+    } catch (err) {
+      addToast("Failed to execute basket order.", 'error');
+    } finally {
+      setShowBasketConfirm(false);
+      // Refresh positions and orders after execution
       setTimeout(() => {
         fetchPositions();
         fetchOpenOrders();
-      }, 500);
+      }, 1000);
     }
   };
-
 
   useEffect(() => {
     const initialFetch = () => {
@@ -274,7 +299,7 @@ function Dashboard() {
 
   return (
     <>
-    <div className="toast-container">
+      <div className="toast-container">
         {notifications.map(n => (
           <ToastNotification 
             key={n.id} 
@@ -284,11 +309,12 @@ function Dashboard() {
           />
         ))}
       </div>
+
       <FundsDisplay funds={funds} />
       <Tabs defaultActiveKey="positions" id="main-tabs" className="mb-4">
         <Tab eventKey="options" title="Live Option Chain">
           <div className="row">
-            <div className="col-md-6 mb-4">
+            <div className="col-md-3 mb-4">
               <Card className="shadow-sm h-100">
                 <Card.Body>
                   <Card.Title className="mb-3 fw-semibold">Polling Interval</Card.Title>
@@ -297,7 +323,7 @@ function Dashboard() {
                 </Card.Body>
               </Card>
             </div>
-            <div className="col-md-6 mb-4">
+            <div className="col-md-3 mb-4">
               <Card className="shadow-sm h-100">
                 <Card.Body>
                   <Card.Title className="mb-3 fw-semibold">Strike Range (ATM ±)</Card.Title>
@@ -306,8 +332,7 @@ function Dashboard() {
                 </Card.Body>
               </Card>
             </div>
-            {/* **NEW**: Card for Lot Size Input */}
-            <div className="col-md-4 mb-4">
+            <div className="col-md-3 mb-4">
               <Card className="shadow-sm h-100">
                 <Card.Body>
                   <Card.Title className="mb-3 fw-semibold">Trade Lots</Card.Title>
@@ -316,6 +341,19 @@ function Dashboard() {
                     value={orderLots}
                     onChange={(e) => setOrderLots(Number(e.target.value))}
                     min="1"
+                  />
+                </Card.Body>
+              </Card>
+            </div>
+            <div className="col-md-3 mb-4">
+              <Card className="shadow-sm h-100">
+                <Card.Body className="d-flex flex-column justify-content-center">
+                  <Form.Check 
+                    type="switch"
+                    id="basket-mode-switch"
+                    label="Basket Mode"
+                    checked={isBasketMode}
+                    onChange={(e) => setIsBasketMode(e.target.checked)}
                   />
                 </Card.Body>
               </Card>
@@ -330,7 +368,7 @@ function Dashboard() {
                   atmStrike={data.atm_strike}
                   prevOptionChain={prevData?.option_chain}
                   strikeRange={strikeRange}
-                  onPlaceOrder={handleInitiateOrder} // Pass the handler
+                  onPlaceOrder={handleInitiateOrder}
                 />
               ) : (
                 <div className="text-center text-muted p-5">Loading option chain data...</div>
@@ -343,7 +381,7 @@ function Dashboard() {
           <Card className="shadow-sm">
             <Card.Body>
               <Card.Title className="fw-semibold text-center mb-3">Current Positions</Card.Title>
-              <div className="d-flex justify-content-end mb-3">
+              <div className="d-flex justify-content-end mb-3 gap-2">
                 <Button 
                   variant="danger" 
                   disabled={selectedPositions.size === 0}
@@ -465,7 +503,7 @@ function Dashboard() {
           <Button variant="danger" onClick={handleBulkSquareOff}>Yes, Square Off All</Button>
         </Modal.Footer>
       </Modal>
-
+      
       <Modal show={showLiquidateConfirm} onHide={() => setShowLiquidateConfirm(false)} centered>
         <Modal.Header closeButton>
           <Modal.Title className="text-danger">Confirm Portfolio Liquidation</Modal.Title>
@@ -493,11 +531,10 @@ function Dashboard() {
           <Modal.Title>Confirm Order</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          Are you sure you want to place the following market order?
+          <p>Are you sure you want to place the following market order?</p>
           <div className="mt-3 p-3 bg-light rounded">
             <strong>Side:</strong> <span className={currentOrder?.side === 'BUY' ? 'text-success' : 'text-danger'}>{currentOrder?.side}</span><br />
             <strong>Lots:</strong> {orderLots}<br />
-            {/* **FIX**: Use the correct key 'lot' */}
             <strong>Quantity:</strong> {orderLots * currentOrder?.lot}<br />
             <strong>Instrument:</strong> {currentOrder?.symId}
           </div>
@@ -507,6 +544,34 @@ function Dashboard() {
           <Button variant="primary" onClick={handleConfirmOrder}>Confirm</Button>
         </Modal.Footer>
       </Modal>
+
+      <Modal show={showBasketConfirm} onHide={() => setShowBasketConfirm(false)} centered size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>Confirm Basket Order</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p>Are you sure you want to place the following <strong>{basket.length}</strong> order(s)?</p>
+          <ListGroup>
+            {basket.map((order, index) => (
+              <ListGroup.Item key={index}>
+                <span className={`fw-bold ${order.side === 'BUY' ? 'text-success' : 'text-danger'}`}>{order.side}</span> {order.lots} Lot(s) of {order.symId}
+              </ListGroup.Item>
+            ))}
+          </ListGroup>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowBasketConfirm(false)}>Cancel</Button>
+          {/* **FIX**: The onClick handler is now correctly assigned */}
+          <Button variant="primary" onClick={handleExecuteBasket}>Execute Basket</Button>
+        </Modal.Footer>
+      </Modal>
+
+      <Basket 
+        basket={basket} 
+        onExecute={() => setShowBasketConfirm(true)} 
+        onClear={() => setBasket([])}
+        onRemove={(index) => setBasket(basket.filter((_, i) => i !== index))}
+      />
     </>
   );
 }
