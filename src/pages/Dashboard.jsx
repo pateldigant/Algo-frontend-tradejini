@@ -3,8 +3,8 @@ import React, { useEffect, useState, useMemo } from "react";
 import OptionChainTable from "../components/OptionChainTable";
 import FundsDisplay from "../components/FundsDisplay";
 import OpenOrdersTable from "../components/OpenOrdersTable";
-import ToastNotification from "../components/ToastNotification";
 import Basket from "../components/Basket";
+import { toast } from 'react-toastify'; // Import the toast function
 import Card from "react-bootstrap/Card";
 import Form from "react-bootstrap/Form";
 import Tabs from "react-bootstrap/Tabs";
@@ -18,7 +18,6 @@ const POLLING_INTERVAL_MS = 1000; // Refresh data every 1 second
 function Dashboard() {
   const [data, setData] = useState(null);
   const [prevData, setPrevData] = useState(null);
-  const [intervalSec, setIntervalSec] = useState(3);
   const [positions, setPositions] = useState([]);
   const [funds, setFunds] = useState(null);
   const [openOrders, setOpenOrders] = useState([]);
@@ -39,19 +38,13 @@ function Dashboard() {
   const [basket, setBasket] = useState([]);
   const [showBasketConfirm, setShowBasketConfirm] = useState(false);
 
-  // Notifications
+  // **FIX**: Restored the missing state variables
   const [notifications, setNotifications] = useState([]);
-
-  // State for the active positions toggle
   const [showOnlyActive, setShowOnlyActive] = useState(true);
 
-  const addToast = (message, type = 'info') => {
-    const id = Date.now();
-    setNotifications(prev => [...prev, { id, message, type }]);
-  };
 
-  const removeToast = (id) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
+  const addToast = (message, type = 'info') => {
+    toast[type](message);
   };
 
   const handleSelectionChange = (symId) => {
@@ -142,12 +135,12 @@ function Dashboard() {
       });
       const result = await response.json();
       if (response.ok) {
-        addToast(result.msg, 'success');
+        toast.success(result.msg);
       } else {
-        addToast(`Error: ${result.detail || "Unknown error"}`, 'error');
+        toast.error(`Error: ${result.detail || "Unknown error"}`);
       }
     } catch (err) {
-      addToast("Failed to send square-off request.", 'error');
+      toast.error("Failed to send square-off request.");
     } finally {
       setShowConfirm(false);
       setSelectedPosition(null);
@@ -164,14 +157,13 @@ function Dashboard() {
         body: JSON.stringify({ symIds: Array.from(selectedPositions) }),
       });
       const result = await response.json();
-      
       if (response.ok) {
-        addToast(result.details.join(', '), 'success');
+        toast.success(result.details.join(', '));
       } else {
-        addToast(`Error: ${result.detail || "Unknown error"}`, 'error');
+        toast.error(`Error: ${result.detail || "Unknown error"}`);
       }
     } catch (err) {
-      addToast("Failed to send bulk square-off request.", 'error');
+      toast.error("Failed to send bulk square-off request.");
     } finally {
       setShowBulkConfirm(false);
       setSelectedPositions(new Set());
@@ -184,12 +176,12 @@ function Dashboard() {
       const response = await fetch("http://localhost:8000/api/liquidate-portfolio", { method: "POST" });
       const result = await response.json();
       if (response.ok) {
-        addToast(result.details, 'success');
+        toast.success(result.details);
       } else {
-        addToast(`Error: ${result.detail || "Unknown error"}`, 'error');
+        toast.error(`Error: ${result.detail || "Unknown error"}`);
       }
     } catch (err) {
-      addToast("Failed to send liquidate portfolio request.", 'error');
+      toast.error("Failed to send liquidate portfolio request.");
     } finally {
       setShowLiquidateConfirm(false);
       setTimeout(() => { fetchPositions(); fetchOpenOrders(); }, 1000);
@@ -198,13 +190,9 @@ function Dashboard() {
 
   const handleInitiateOrder = (orderData) => {
     if (isBasketMode) {
-      const newBasketItem = {
-        ...orderData,
-        lots: orderLots,
-        quantity: orderLots * orderData.lot,
-      };
+      const newBasketItem = { ...orderData, lots: orderLots, quantity: orderLots * orderData.lot };
       setBasket(prev => [...prev, newBasketItem]);
-      addToast(`${orderData.symId} added to basket.`, 'success');
+      toast.success(`${orderData.symId} added to basket.`);
     } else {
       setCurrentOrder(orderData);
       setShowOrderConfirm(true);
@@ -214,11 +202,7 @@ function Dashboard() {
   const handleConfirmOrder = async () => {
     if (!currentOrder) return;
     try {
-      const orderDetails = {
-        symId: currentOrder.symId,
-        qty: orderLots * currentOrder.lot,
-        side: currentOrder.side,
-      };
+      const orderDetails = { symId: currentOrder.symId, qty: orderLots * currentOrder.lot, side: currentOrder.side };
       const response = await fetch("http://localhost:8000/api/place-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -226,12 +210,12 @@ function Dashboard() {
       });
       const result = await response.json();
       if (response.ok) {
-        addToast(result.msg, 'success');
+        toast.success(result.msg);
       } else {
-        addToast(`Error: ${result.detail || "Unknown error"}`, 'error');
+        toast.error(`Error: ${result.detail || "Unknown error"}`);
       }
     } catch (err) {
-      addToast("Failed to place order.", 'error');
+      toast.error("Failed to place order.");
     } finally {
       setShowOrderConfirm(false);
       setCurrentOrder(null);
@@ -249,20 +233,15 @@ function Dashboard() {
       });
       const result = await response.json();
       if (response.ok) {
-        addToast(result.msg, 'success');
-        setBasket([]); // Clear the basket on success
+        toast.success(result.msg);
+        setBasket([]);
       } else {
-        addToast(`Error: ${result.detail || "Unknown error"}`, 'error');
+        toast.error(`Error: ${result.detail || "Unknown error"}`);
       }
     } catch (err) {
-      addToast("Failed to execute basket order.", 'error');
+      toast.error("Failed to execute basket order.");
     } finally {
       setShowBasketConfirm(false);
-      // Refresh positions and orders after execution
-      setTimeout(() => {
-        fetchPositions();
-        fetchOpenOrders();
-      }, 1000);
     }
   };
 
