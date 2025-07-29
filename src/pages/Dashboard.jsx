@@ -1,5 +1,5 @@
 // src/pages/Dashboard.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import OptionChainTable from "../components/OptionChainTable";
 import FundsDisplay from "../components/FundsDisplay";
 import OpenOrdersTable from "../components/OpenOrdersTable";
@@ -11,7 +11,9 @@ import Tabs from "react-bootstrap/Tabs";
 import Tab from "react-bootstrap/Tab";
 import Button from "react-bootstrap/Button";
 import Modal from "react-bootstrap/Modal";
-import { Alert, ListGroup } from "react-bootstrap"; // **FIX**: Added ListGroup to the import
+import { Alert, ListGroup } from "react-bootstrap";
+
+const POLLING_INTERVAL_MS = 1000; // Refresh data every 1 second
 
 function Dashboard() {
   const [data, setData] = useState(null);
@@ -40,6 +42,9 @@ function Dashboard() {
   // Notifications
   const [notifications, setNotifications] = useState([]);
 
+  // State for the active positions toggle
+  const [showOnlyActive, setShowOnlyActive] = useState(true);
+
   const addToast = (message, type = 'info') => {
     const id = Date.now();
     setNotifications(prev => [...prev, { id, message, type }]);
@@ -59,11 +64,15 @@ function Dashboard() {
   };
 
   const handleSelectAll = (e) => {
+    const displayedIds = displayedPositions.map(p => p.symId);
     if (e.target.checked) {
-      const allOpenPositionIds = positions.filter(p => p.netQty !== 0).map(p => p.symId);
-      setSelectedPositions(new Set(allOpenPositionIds));
+      setSelectedPositions(prev => new Set([...prev, ...displayedIds]));
     } else {
-      setSelectedPositions(new Set());
+      setSelectedPositions(prev => {
+        const newSelection = new Set(prev);
+        displayedIds.forEach(id => newSelection.delete(id));
+        return newSelection;
+      });
     }
   };
 
@@ -266,10 +275,10 @@ function Dashboard() {
     };
     initialFetch();
     
-    const id1 = setInterval(fetchSnapshot, intervalSec * 1000);
-    const id2 = setInterval(fetchPositions, intervalSec * 1000);
-    const id3 = setInterval(fetchFunds, intervalSec * 1000 * 2);
-    const id4 = setInterval(fetchOpenOrders, intervalSec * 1000);
+    const id1 = setInterval(fetchSnapshot, POLLING_INTERVAL_MS);
+    const id2 = setInterval(fetchPositions, POLLING_INTERVAL_MS);
+    const id3 = setInterval(fetchFunds, POLLING_INTERVAL_MS * 2);
+    const id4 = setInterval(fetchOpenOrders, POLLING_INTERVAL_MS);
 
     return () => {
       clearInterval(id1);
@@ -277,7 +286,7 @@ function Dashboard() {
       clearInterval(id3);
       clearInterval(id4);
     };
-  }, [intervalSec]);
+  }, []);
 
   const getDisplayAvgPrice = (p) => {
     const netQty = p?.netQty ?? 0;
@@ -291,6 +300,14 @@ function Dashboard() {
     }
     return p.buyAvgPrice;
   };
+
+  // **NEW**: Memoized variable to hold the positions to be displayed
+  const displayedPositions = useMemo(() => {
+    if (showOnlyActive) {
+      return positions.filter(p => p.netQty !== 0);
+    }
+    return positions;
+  }, [positions, showOnlyActive]);
 
   const realized = positions.reduce((sum, p) => sum + (p?.realizedPnl ?? 0), 0);
   const unrealized = positions.reduce((sum, p) => sum + (p?.unrealizedPnlLive ?? 0), 0);
@@ -314,16 +331,7 @@ function Dashboard() {
       <Tabs defaultActiveKey="positions" id="main-tabs" className="mb-4">
         <Tab eventKey="options" title="Live Option Chain">
           <div className="row">
-            <div className="col-md-3 mb-4">
-              <Card className="shadow-sm h-100">
-                <Card.Body>
-                  <Card.Title className="mb-3 fw-semibold">Polling Interval</Card.Title>
-                  <Form.Range min={1} max={10} value={intervalSec} onChange={(e) => setIntervalSec(Number(e.target.value))} />
-                  <div className="text-end text-muted small">Interval: {intervalSec}s</div>
-                </Card.Body>
-              </Card>
-            </div>
-            <div className="col-md-3 mb-4">
+            <div className="col-md-4 mb-4">
               <Card className="shadow-sm h-100">
                 <Card.Body>
                   <Card.Title className="mb-3 fw-semibold">Strike Range (ATM ±)</Card.Title>
@@ -332,7 +340,7 @@ function Dashboard() {
                 </Card.Body>
               </Card>
             </div>
-            <div className="col-md-3 mb-4">
+            <div className="col-md-4 mb-4">
               <Card className="shadow-sm h-100">
                 <Card.Body>
                   <Card.Title className="mb-3 fw-semibold">Trade Lots</Card.Title>
@@ -345,7 +353,7 @@ function Dashboard() {
                 </Card.Body>
               </Card>
             </div>
-            <div className="col-md-3 mb-4">
+            <div className="col-md-4 mb-4">
               <Card className="shadow-sm h-100">
                 <Card.Body className="d-flex flex-column justify-content-center">
                   <Form.Check 
@@ -381,21 +389,31 @@ function Dashboard() {
           <Card className="shadow-sm">
             <Card.Body>
               <Card.Title className="fw-semibold text-center mb-3">Current Positions</Card.Title>
-              <div className="d-flex justify-content-end mb-3 gap-2">
-                <Button 
-                  variant="danger" 
-                  disabled={selectedPositions.size === 0}
-                  onClick={() => setShowBulkConfirm(true)}
-                >
-                  Square Off Selected ({selectedPositions.size})
-                </Button>
-                <Button 
-                  variant="outline-danger"
-                  disabled={openPositions.length === 0 && openOrders.length === 0}
-                  onClick={() => setShowLiquidateConfirm(true)}
-                >
-                  Square Off All
-                </Button>
+              <div className="d-flex justify-content-between align-items-center mb-3">
+                {/* **NEW**: Toggle for active positions */}
+                <Form.Check 
+                  type="switch"
+                  id="active-positions-switch"
+                  label="Show only active positions"
+                  checked={showOnlyActive}
+                  onChange={(e) => setShowOnlyActive(e.target.checked)}
+                />
+                <div className="d-flex gap-2">
+                  <Button 
+                    variant="danger" 
+                    disabled={selectedPositions.size === 0}
+                    onClick={() => setShowBulkConfirm(true)}
+                  >
+                    Square Off Selected ({selectedPositions.size})
+                  </Button>
+                  <Button 
+                    variant="outline-danger"
+                    disabled={displayedPositions.length === 0 && openOrders.length === 0}
+                    onClick={() => setShowLiquidateConfirm(true)}
+                  >
+                    Square Off All
+                  </Button>
+                </div>
               </div>
               <div className="row text-center mb-3">
                 <div className="col"><strong>Realized PnL:</strong> <span className={realized >= 0 ? "text-success" : "text-danger"}>{realized.toFixed(2)}</span></div>
@@ -410,7 +428,7 @@ function Dashboard() {
                         <Form.Check 
                           type="checkbox"
                           onChange={handleSelectAll}
-                          checked={openPositions.length > 0 && selectedPositions.size === openPositions.length}
+                          checked={displayedPositions.length > 0 && selectedPositions.size === displayedPositions.length}
                         />
                       </th>
                       <th>Symbol</th>
@@ -423,7 +441,8 @@ function Dashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {positions.length > 0 ? positions.map((p, idx) => (
+                    {/* **NEW**: Iterate over the filtered 'displayedPositions' */}
+                    {displayedPositions.length > 0 ? displayedPositions.map((p, idx) => (
                       <tr key={idx} className={p.isClosedToday ? "text-muted" : ""}>
                         <td>
                           <Form.Check 
@@ -456,7 +475,7 @@ function Dashboard() {
                         </td>
                       </tr>
                     )) : (
-                      <tr><td colSpan="8" className="text-muted">No open positions.</td></tr>
+                      <tr><td colSpan="8" className="text-muted">No positions to display.</td></tr>
                     )}
                   </tbody>
                 </table>
