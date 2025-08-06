@@ -1,6 +1,7 @@
 // src/pages/Dashboard.jsx
 import React, { useEffect, useState, useMemo } from "react";
 import OptionChainTable from "../components/OptionChainTable";
+
 import FundsDisplay from "../components/FundsDisplay";
 import OpenOrdersTable from "../components/OpenOrdersTable";
 import Basket from "../components/Basket";
@@ -307,47 +308,61 @@ function Dashboard() {
       </div>
 
       <FundsDisplay funds={funds} />
-      <Tabs defaultActiveKey="positions" id="main-tabs" className="mb-4">
-        <Tab eventKey="options" title="Live Option Chain">
-          <div className="row">
-            <div className="col-md-4 mb-4">
-              <Card className="shadow-sm h-100">
-                <Card.Body>
-                  <Card.Title className="mb-3 fw-semibold">Strike Range (ATM ±)</Card.Title>
-                  <Form.Range min={5} max={50} step={5} value={strikeRange} onChange={(e) => setStrikeRange(Number(e.target.value))} />
-                  <div className="text-end text-muted small">Range: {strikeRange} strikes</div>
-                </Card.Body>
-              </Card>
-            </div>
-            <div className="col-md-4 mb-4">
-              <Card className="shadow-sm h-100">
-                <Card.Body>
-                  <Card.Title className="mb-3 fw-semibold">Trade Lots</Card.Title>
-                  <Form.Control 
-                    type="number" 
-                    value={orderLots}
-                    onChange={(e) => setOrderLots(Number(e.target.value))}
-                    min="1"
-                  />
-                </Card.Body>
-              </Card>
-            </div>
-            <div className="col-md-4 mb-4">
-              <Card className="shadow-sm h-100">
-                <Card.Body className="d-flex flex-column justify-content-center">
-                  <Form.Check 
-                    type="switch"
-                    id="basket-mode-switch"
-                    label="Basket Mode"
-                    checked={isBasketMode}
-                    onChange={(e) => setIsBasketMode(e.target.checked)}
-                  />
-                </Card.Body>
-              </Card>
-            </div>
-          </div>
-          <Card className="shadow-sm">
+
+
+      {/* Fixed grid layout for dashboard sections */}
+      <div className="container-fluid" style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '180px 1fr', gap: '16px', height: '65vh'}}>
+        {/* Pending Orders - top right */}
+        <div style={{gridColumn: 2, gridRow: 1, height: '180px', overflow: 'auto'}}>
+          <Card className="shadow-sm h-100">
             <Card.Body>
+              <Card.Title className="fw-semibold text-center mb-3">Pending Orders</Card.Title>
+              <OpenOrdersTable orders={openOrders} />
+            </Card.Body>
+          </Card>
+        </div>
+        {/* Option Chain - left, spans both rows */}
+        <div style={{gridColumn: 1, gridRow: '1 / span 2', height: '100%', overflow: 'auto'}}>
+          <Card className="shadow-sm h-100">
+            <Card.Body>
+              <Card.Title className="fw-semibold text-center mb-3">Live Option Chain</Card.Title>
+              <div className="row">
+                <div className="col-md-4 mb-4">
+                  <Card className="shadow-sm h-100">
+                    <Card.Body>
+                      <Card.Title className="mb-3 fw-semibold">Strike Range (ATM ±)</Card.Title>
+                      <Form.Range min={5} max={50} step={5} value={strikeRange} onChange={(e) => setStrikeRange(Number(e.target.value))} />
+                      <div className="text-end text-muted small">Range: {strikeRange} strikes</div>
+                    </Card.Body>
+                  </Card>
+                </div>
+                <div className="col-md-4 mb-4">
+                  <Card className="shadow-sm h-100">
+                    <Card.Body>
+                      <Card.Title className="mb-3 fw-semibold">Trade Lots</Card.Title>
+                      <Form.Control 
+                        type="number" 
+                        value={orderLots}
+                        onChange={(e) => setOrderLots(Number(e.target.value))}
+                        min="1"
+                      />
+                    </Card.Body>
+                  </Card>
+                </div>
+                <div className="col-md-4 mb-4">
+                  <Card className="shadow-sm h-100">
+                    <Card.Body className="d-flex flex-column justify-content-center">
+                      <Form.Check 
+                        type="switch"
+                        id="basket-mode-switch"
+                        label="Basket Mode"
+                        checked={isBasketMode}
+                        onChange={(e) => setIsBasketMode(e.target.checked)}
+                      />
+                    </Card.Body>
+                  </Card>
+                </div>
+              </div>
               {data && data.option_chain ? (
                 <OptionChainTable 
                   optionChain={data.option_chain} 
@@ -362,14 +377,13 @@ function Dashboard() {
               )}
             </Card.Body>
           </Card>
-        </Tab>
-        
-        <Tab eventKey="positions" title="Live Positions">
-          <Card className="shadow-sm">
+        </div>
+        {/* Live Positions - bottom right */}
+        <div style={{gridColumn: 2, gridRow: 2, height: '100%', overflow: 'auto'}}>
+          <Card className="shadow-sm h-100">
             <Card.Body>
-              <Card.Title className="fw-semibold text-center mb-3">Current Positions</Card.Title>
+              <Card.Title className="fw-semibold text-center mb-3">Live Positions</Card.Title>
               <div className="d-flex justify-content-between align-items-center mb-3">
-                {/* **NEW**: Toggle for active positions */}
                 <Form.Check 
                   type="switch"
                   id="active-positions-switch"
@@ -420,7 +434,6 @@ function Dashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {/* **NEW**: Iterate over the filtered 'displayedPositions' */}
                     {displayedPositions.length > 0 ? displayedPositions.map((p, idx) => (
                       <tr key={idx} className={p.isClosedToday ? "text-muted" : ""}>
                         <td>
@@ -461,17 +474,8 @@ function Dashboard() {
               </div>
             </Card.Body>
           </Card>
-        </Tab>
-        
-        <Tab eventKey="open-orders" title={`Open Orders (${openOrders.length})`}>
-          <Card className="shadow-sm">
-            <Card.Body>
-              <Card.Title className="fw-semibold text-center mb-3">Pending Orders</Card.Title>
-              <OpenOrdersTable orders={openOrders} />
-            </Card.Body>
-          </Card>
-        </Tab>
-      </Tabs>
+        </div>
+      </div>
 
       <Modal show={showConfirm} onHide={() => setShowConfirm(false)} centered>
         <Modal.Header closeButton>
