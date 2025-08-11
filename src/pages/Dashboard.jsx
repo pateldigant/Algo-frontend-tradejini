@@ -23,8 +23,7 @@ function Dashboard() {
   const [openOrders, setOpenOrders] = useState([]);
   const [strikeRange, setStrikeRange] = useState(10);
   const [orderLots, setOrderLots] = useState(1);
-
-  // Modals
+  const [positionLots, setPositionLots] = useState(1);
   const [showConfirm, setShowConfirm] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState(null);
   const [selectedPositions, setSelectedPositions] = useState(new Set());
@@ -32,20 +31,10 @@ function Dashboard() {
   const [showLiquidateConfirm, setShowLiquidateConfirm] = useState(false);
   const [showOrderConfirm, setShowOrderConfirm] = useState(false);
   const [currentOrder, setCurrentOrder] = useState(null);
-  
-  // Basket
   const [isBasketMode, setIsBasketMode] = useState(false);
   const [basket, setBasket] = useState([]);
   const [showBasketConfirm, setShowBasketConfirm] = useState(false);
-
-  // **FIX**: Restored the missing state variables
-  const [notifications, setNotifications] = useState([]);
   const [showOnlyActive, setShowOnlyActive] = useState(true);
-
-
-  const addToast = (message, type = 'info') => {
-    toast[type](message);
-  };
 
   const handleSelectionChange = (symId) => {
     setSelectedPositions(prev => {
@@ -157,6 +146,7 @@ function Dashboard() {
         body: JSON.stringify({ symIds: Array.from(selectedPositions) }),
       });
       const result = await response.json();
+      
       if (response.ok) {
         toast.success(result.details.join(', '));
       } else {
@@ -188,13 +178,14 @@ function Dashboard() {
     }
   };
 
-  const handleInitiateOrder = (orderData) => {
+  const handleInitiateOrder = (orderData, lots) => {
+    const tradeLots = lots || 1; // Default to 1 if lots are not provided
     if (isBasketMode) {
-      const newBasketItem = { ...orderData, lots: orderLots, quantity: orderLots * orderData.lot };
+      const newBasketItem = { ...orderData, lots: tradeLots, quantity: tradeLots * orderData.lot };
       setBasket(prev => [...prev, newBasketItem]);
       toast.success(`${orderData.symId} added to basket.`);
     } else {
-      setCurrentOrder(orderData);
+      setCurrentOrder({ ...orderData, lots: tradeLots });
       setShowOrderConfirm(true);
     }
   };
@@ -202,7 +193,11 @@ function Dashboard() {
   const handleConfirmOrder = async () => {
     if (!currentOrder) return;
     try {
-      const orderDetails = { symId: currentOrder.symId, qty: orderLots * currentOrder.lot, side: currentOrder.side };
+      const orderDetails = {
+        symId: currentOrder.symId,
+        qty: currentOrder.lots * currentOrder.lot,
+        side: currentOrder.side,
+      };
       const response = await fetch("http://localhost:8000/api/place-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -280,7 +275,6 @@ function Dashboard() {
     return p.buyAvgPrice;
   };
 
-  // **NEW**: Memoized variable to hold the positions to be displayed
   const displayedPositions = useMemo(() => {
     if (showOnlyActive) {
       return positions.filter(p => p.netQty !== 0);
@@ -291,21 +285,9 @@ function Dashboard() {
   const realized = positions.reduce((sum, p) => sum + (p?.realizedPnl ?? 0), 0);
   const unrealized = positions.reduce((sum, p) => sum + (p?.unrealizedPnlLive ?? 0), 0);
   const total = realized + unrealized;
-  const openPositions = positions.filter(p => p.netQty !== 0);
 
   return (
     <>
-      <div className="toast-container">
-        {notifications.map(n => (
-          <ToastNotification 
-            key={n.id} 
-            message={n.message} 
-            type={n.type} 
-            onDismiss={() => removeToast(n.id)}
-          />
-        ))}
-      </div>
-
       <FundsDisplay funds={funds} />
       <Tabs defaultActiveKey="positions" id="main-tabs" className="mb-4">
         <Tab eventKey="options" title="Live Option Chain">
@@ -355,7 +337,8 @@ function Dashboard() {
                   atmStrike={data.atm_strike}
                   prevOptionChain={prevData?.option_chain}
                   strikeRange={strikeRange}
-                  onPlaceOrder={handleInitiateOrder}
+                  // **FIX**: Pass the correct lot size from the "Trade Lots" input
+                  onPlaceOrder={(orderData) => handleInitiateOrder(orderData, orderLots)}
                 />
               ) : (
                 <div className="text-center text-muted p-5">Loading option chain data...</div>
@@ -369,7 +352,6 @@ function Dashboard() {
             <Card.Body>
               <Card.Title className="fw-semibold text-center mb-3">Current Positions</Card.Title>
               <div className="d-flex justify-content-between align-items-center mb-3">
-                {/* **NEW**: Toggle for active positions */}
                 <Form.Check 
                   type="switch"
                   id="active-positions-switch"
@@ -377,6 +359,16 @@ function Dashboard() {
                   checked={showOnlyActive}
                   onChange={(e) => setShowOnlyActive(e.target.checked)}
                 />
+                <div className="d-flex align-items-center gap-2" style={{width: '150px'}}>
+                  <Form.Label className="mb-0 fw-semibold small">Lots:</Form.Label>
+                  <Form.Control 
+                    type="number"
+                    size="sm"
+                    value={positionLots}
+                    onChange={(e) => setPositionLots(Number(e.target.value))}
+                    min="1"
+                  />
+                </div>
                 <div className="d-flex gap-2">
                   <Button 
                     variant="danger" 
@@ -411,6 +403,7 @@ function Dashboard() {
                         />
                       </th>
                       <th>Symbol</th>
+                      <th>Lots</th>
                       <th>Qty</th>
                       <th>LTP</th>
                       <th>Avg Price</th>
@@ -420,7 +413,6 @@ function Dashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {/* **NEW**: Iterate over the filtered 'displayedPositions' */}
                     {displayedPositions.length > 0 ? displayedPositions.map((p, idx) => (
                       <tr key={idx} className={p.isClosedToday ? "text-muted" : ""}>
                         <td>
@@ -432,6 +424,7 @@ function Dashboard() {
                           />
                         </td>
                         <td className="fw-semibold">{p.symId}</td>
+                        <td>{p.lot ? p.netQty / p.lot : "-"}</td>
                         <td>{p.netQty}</td>
                         <td>{p.ltp ?? "-"}</td>
                         <td>{getDisplayAvgPrice(p)?.toFixed(2) ?? "-"}</td>
@@ -440,21 +433,35 @@ function Dashboard() {
                         </td>
                         <td className={p.realizedPnl >= 0 ? "text-success" : "text-danger"}>{p.realizedPnl?.toFixed(2) ?? "-"}</td>
                         <td>
-                          <Button
-                            variant="outline-danger"
-                            size="sm"
-                            disabled={p.netQty === 0}
-                            onClick={() => {
-                              setSelectedPosition(p);
-                              setShowConfirm(true);
-                            }}
-                          >
-                            Square Off
-                          </Button>
+                          <div className="d-flex justify-content-center gap-1">
+                            <Button 
+                              size="sm" 
+                              variant="outline-primary"
+                              disabled={!p.lot}
+                              onClick={() => handleInitiateOrder({ symId: p.symId, lot: p.lot, side: 'BUY' }, positionLots)}
+                            >B</Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline-danger"
+                              disabled={!p.lot}
+                              onClick={() => handleInitiateOrder({ symId: p.symId, lot: p.lot, side: 'SELL' }, positionLots)}
+                            >S</Button>
+                            <Button
+                              variant="outline-secondary"
+                              size="sm"
+                              disabled={p.netQty === 0}
+                              onClick={() => {
+                                setSelectedPosition(p);
+                                setShowConfirm(true);
+                              }}
+                            >
+                              Exit
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     )) : (
-                      <tr><td colSpan="8" className="text-muted">No positions to display.</td></tr>
+                      <tr><td colSpan="9" className="text-muted">No positions to display.</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -532,8 +539,8 @@ function Dashboard() {
           <p>Are you sure you want to place the following market order?</p>
           <div className="mt-3 p-3 bg-light rounded">
             <strong>Side:</strong> <span className={currentOrder?.side === 'BUY' ? 'text-success' : 'text-danger'}>{currentOrder?.side}</span><br />
-            <strong>Lots:</strong> {orderLots}<br />
-            <strong>Quantity:</strong> {orderLots * currentOrder?.lot}<br />
+            <strong>Lots:</strong> {currentOrder?.lots}<br />
+            <strong>Quantity:</strong> {currentOrder?.lots * currentOrder?.lot}<br />
             <strong>Instrument:</strong> {currentOrder?.symId}
           </div>
         </Modal.Body>
