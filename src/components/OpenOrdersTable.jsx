@@ -1,9 +1,8 @@
 // src/components/OpenOrdersTable.jsx
 import React from "react";
-import Table from "react-bootstrap/Table";
-import Badge from "react-bootstrap/Badge";
+import { Table, Badge, Button } from "react-bootstrap";
 
-function OpenOrdersTable({ orders }) {
+function OpenOrdersTable({ orders, onCancel, onModify }) {
   const getStatusBadge = (status) => {
     switch (status?.toLowerCase()) {
       case "open":
@@ -25,13 +24,15 @@ function OpenOrdersTable({ orders }) {
             <th>Side</th>
             <th>Type</th>
             <th>Price</th>
+            <th>Trigger Price</th>
             <th>Status</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           {orders.length > 0 ? (
-            orders.map((order, idx) => (
-              <tr key={idx}>
+            orders.map((order) => (
+              <tr key={order.orderId}>
                 <td className="fw-semibold">{order.symId}</td>
                 <td>{order.qty}</td>
                 <td>
@@ -39,14 +40,25 @@ function OpenOrdersTable({ orders }) {
                     {order.side?.toUpperCase()}
                   </span>
                 </td>
-                <td>{order.type?.toUpperCase()}</td>
+                <td>{order.type?.toUpperCase() || 'MARKET'}</td>
                 <td>{order.limitPrice > 0 ? order.limitPrice.toFixed(2) : "-"}</td>
+                <td>{order.trigPrice > 0 ? order.trigPrice.toFixed(2) : "-"}</td>
                 <td>{getStatusBadge(order.status)}</td>
+                <td>
+                  <div className="d-flex justify-content-center gap-2">
+                    <Button variant="outline-primary" size="sm" onClick={() => onModify(order)}>
+                      Modify
+                    </Button>
+                    <Button variant="outline-danger" size="sm" onClick={() => onCancel(order.orderId)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </td>
               </tr>
             ))
           ) : (
             <tr>
-              <td colSpan="6" className="text-muted p-4">
+              <td colSpan="8" className="text-muted p-4">
                 No open orders.
               </td>
             </tr>

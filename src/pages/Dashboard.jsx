@@ -36,6 +36,12 @@ function Dashboard() {
   const [showBasketConfirm, setShowBasketConfirm] = useState(false);
   const [showOnlyActive, setShowOnlyActive] = useState(true);
 
+  // **NEW**: State for the order modification modal
+  const [showModifyModal, setShowModifyModal] = useState(false);
+  const [orderToModify, setOrderToModify] = useState(null);
+  const [newPrice, setNewPrice] = useState("");
+  const [newTriggerPrice, setNewTriggerPrice] = useState("");
+
   const handleSelectionChange = (symId) => {
     setSelectedPositions(prev => {
       const newSelection = new Set(prev);
@@ -237,6 +243,65 @@ function Dashboard() {
       toast.error("Failed to execute basket order.");
     } finally {
       setShowBasketConfirm(false);
+    }
+  };
+
+  const openModifyModal = (order) => {
+    setOrderToModify(order);
+    setNewPrice(order.limitPrice || "");
+    setNewTriggerPrice(order.stopPrice || "");
+    setShowModifyModal(true);
+  };
+
+  const handleModifyOrder = async () => {
+    if (!orderToModify) return;
+    try {
+      // **FIX**: Send the entire original order object in the payload
+      const payload = {
+        order: orderToModify,
+        price: parseFloat(newPrice) || null,
+        triggerPrice: parseFloat(newTriggerPrice) || null,
+      };
+      const response = await fetch("http://localhost:8000/api/modify-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json();
+      if (response.ok) {
+        toast.success(result.msg);
+      } else {
+        toast.error(`Error: ${result.detail || "Unknown error"}`);
+      }
+    } catch (err) {
+      toast.error("Failed to send modify request.");
+    } finally {
+      setShowModifyModal(false);
+      setOrderToModify(null);
+      setTimeout(fetchOpenOrders, 500);
+    }
+  };
+
+  const handleCancelOrder = async (orderId) => {
+    if (!window.confirm("Are you sure you want to cancel this order?")) {
+      return;
+    }
+    try {
+      const response = await fetch("http://localhost:8000/api/cancel-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId }),
+      });
+      const result = await response.json();
+      if (response.ok) {
+        toast.success(result.msg);
+      } else {
+        toast.error(`Error: ${result.detail || "Unknown error"}`);
+      }
+    } catch (err) {
+      toast.error("Failed to send cancel request.");
+    } finally {
+      setTimeout(fetchOpenOrders, 500);
     }
   };
 
@@ -474,7 +539,11 @@ function Dashboard() {
           <Card className="shadow-sm">
             <Card.Body>
               <Card.Title className="fw-semibold text-center mb-3">Pending Orders</Card.Title>
-              <OpenOrdersTable orders={openOrders} />
+              <OpenOrdersTable 
+                orders={openOrders} 
+                onCancel={handleCancelOrder}
+                onModify={openModifyModal}
+              />
             </Card.Body>
           </Card>
         </Tab>
@@ -568,6 +637,41 @@ function Dashboard() {
           <Button variant="secondary" onClick={() => setShowBasketConfirm(false)}>Cancel</Button>
           {/* **FIX**: The onClick handler is now correctly assigned */}
           <Button variant="primary" onClick={handleExecuteBasket}>Execute Basket</Button>
+        </Modal.Footer>
+      </Modal>
+
+      <Modal show={showModifyModal} onHide={() => setShowModifyModal(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Modify Order</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p><strong>Instrument:</strong> {orderToModify?.symId}</p>
+          <Form>
+            <Form.Group className="mb-3">
+              <Form.Label>New Price</Form.Label>
+              <Form.Control 
+                type="number" 
+                value={newPrice}
+                onChange={(e) => setNewPrice(e.target.value)}
+                placeholder="Enter new limit price"
+              />
+            </Form.Group>
+            {typeof orderToModify?.type === 'string' && orderToModify.type.toLowerCase().includes('stop') && (
+              <Form.Group className="mb-3">
+                <Form.Label>New Trigger Price</Form.Label>
+                <Form.Control 
+                  type="number" 
+                  value={newTriggerPrice}
+                  onChange={(e) => setNewTriggerPrice(e.target.value)}
+                  placeholder="Enter new trigger price"
+                />
+              </Form.Group>
+            )}
+          </Form>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowModifyModal(false)}>Cancel</Button>
+          <Button variant="primary" onClick={handleModifyOrder}>Confirm Modification</Button>
         </Modal.Footer>
       </Modal>
 
