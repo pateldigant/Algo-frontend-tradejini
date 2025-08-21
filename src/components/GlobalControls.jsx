@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
 
 const GlobalControls = ({
   orderLots,
@@ -10,7 +11,9 @@ const GlobalControls = ({
   strikeRange,
   setStrikeRange,
   isBasketMode,
-  setIsBasketMode
+  setIsBasketMode,
+  isFastMode,       // <-- New prop
+  setIsFastMode     // <-- New prop
 }) => {
   return (
     <Card>
@@ -36,6 +39,9 @@ const GlobalControls = ({
             onChange={(e) => setStrikeRange(Number(e.target.value))}
           />
         </div>
+
+        <Separator orientation="vertical" className="h-8" />
+
         <div className="flex items-center space-x-2">
           <Switch
             id="basket-mode"
@@ -43,6 +49,14 @@ const GlobalControls = ({
             onCheckedChange={setIsBasketMode}
           />
           <Label htmlFor="basket-mode" className="font-semibold">Basket Mode</Label>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="fast-mode"
+            checked={isFastMode}
+            onCheckedChange={setIsFastMode}
+          />
+          <Label htmlFor="fast-mode" className="font-semibold text-sky-600">Fast Mode</Label>
         </div>
       </CardContent>
     </Card>

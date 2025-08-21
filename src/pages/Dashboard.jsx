@@ -33,6 +33,7 @@ function Dashboard() {
   const [modalState, setModalState] = useState({ type: null, data: null });
   const [selectedPositions, setSelectedPositions] = useState(new Set());
   const [isBasketMode, setIsBasketMode] = useState(false);
+  const [isFastMode, setIsFastMode] = useState(false); 
   const [basket, setBasket] = useState([]);
   const [showOnlyActive, setShowOnlyActive] = useState(true);
 
@@ -132,20 +133,32 @@ function Dashboard() {
   const handleInitiateOrder = (orderData, lots) => {
     const tradeLots = lots || 1;
     const order = { ...orderData, lots: tradeLots, quantity: tradeLots * orderData.lot };
+    
     if (isBasketMode) {
       setBasket(prev => [...prev, order]);
       toast({ title: "Added to Basket", description: `${order.symId} was added to your order basket.` });
+    } else if (isFastMode) {
+      // If Fast Mode is on, execute immediately
+      handleConfirmOrder(order);
     } else {
+      // Otherwise, show confirmation modal
       setModalState({ type: 'confirmOrder', data: order });
     }
   };
-  const handleConfirmOrder = () => {
-    const { symId, lot, side, lots } = modalState.data;
+  
+  // Modified to accept an argument instead of relying on state
+  const handleConfirmOrder = (order) => {
+    if (!order) return;
+    const { symId, lot, side, lots } = order;
     postRequest("place-order", { symId, qty: lots * lot, side }, "Order placed successfully.", "Failed to place order.");
   };
-  const handleSquareOff = () => {
-    postRequest("squareoff", { symId: modalState.data.symId }, "Position squared off.", "Square-off failed.");
+
+  // Modified to accept an argument
+  const handleSquareOff = (position) => {
+    if (!position) return;
+    postRequest("squareoff", { symId: position.symId }, "Position squared off.", "Square-off failed.");
   };
+
   const handleBulkSquareOff = () => {
     postRequest("squareoff-multiple", { symIds: Array.from(selectedPositions) }, "Selected positions squared off.", "Bulk square-off failed.");
     setSelectedPositions(new Set());
@@ -184,6 +197,8 @@ function Dashboard() {
         setStrikeRange={setStrikeRange}
         isBasketMode={isBasketMode}
         setIsBasketMode={setIsBasketMode}
+        isFastMode={isFastMode}       
+        setIsFastMode={setIsFastMode} 
       />
       
       <ResizablePanelGroup
@@ -202,7 +217,13 @@ function Dashboard() {
               selectedPositions={selectedPositions}
               setSelectedPositions={setSelectedPositions}
               onPlaceOrder={handleInitiateOrder}
-              onExit={(position) => setModalState({ type: 'confirmSquareOff', data: position })}
+              onExit={(position) => {
+                if (isFastMode) {
+                  handleSquareOff(position); // Execute directly in Fast Mode
+                } else {
+                  setModalState({ type: 'confirmSquareOff', data: position });
+                }
+              }}
               onExitSelected={() => setModalState({ type: 'confirmBulkSquareOff', data: null })}
               onExitAll={() => setModalState({ type: 'confirmLiquidate', data: null })}
             />
@@ -256,8 +277,9 @@ function Dashboard() {
         modalState={modalState}
         onClose={() => setModalState({ type: null, data: null })}
         actions={{
-          handleConfirmOrder,
-          handleSquareOff,
+          // Pass the modified handlers to the modal
+          handleConfirmOrder: () => handleConfirmOrder(modalState.data),
+          handleSquareOff: () => handleSquareOff(modalState.data),
           handleBulkSquareOff,
           handleLiquidatePortfolio,
           handleModifyOrder,
