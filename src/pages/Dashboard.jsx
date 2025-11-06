@@ -178,7 +178,14 @@ function Dashboard() {
     postRequest("cancel-order", { orderId }, "Order cancelled.", "Failed to cancel order.");
   };
   const handleExecuteBasket = () => {
-      postRequest("place-basket-order", { orders: basket }, "Basket order executed.", "Basket execution failed.");
+      // Transform basket orders to the correct format for backend
+      const formattedOrders = basket.map(order => ({
+          symId: order.symId,
+          qty: order.lots * order.lot,  // Backend expects 'qty', not 'quantity' or 'lots'
+          side: order.side,
+          type: order.type || "MARKET"
+      }));
+      postRequest("place-basket-order", { orders: formattedOrders }, "Basket order executed.", "Basket execution failed.");
       setBasket([]);
   };
   const displayedPositions = useMemo(() => {
