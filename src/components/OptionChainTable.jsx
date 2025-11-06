@@ -53,9 +53,16 @@ function OptionChainTable({ optionChain, spotPrice, atmStrike, prevOptionChain, 
 
   return (
     <>
-      <div className="flex justify-around mb-2 font-semibold text-lg p-2 bg-slate-100 rounded-md">
-        <span>ATM Strike: <span className="text-blue-600">{atmStrike}</span></span>
-        <span>Spot Price: <span className="text-blue-600">{spotPrice}</span></span>
+      <div className="flex justify-around mb-3 p-4 bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-50 rounded-xl border-2 border-blue-200 shadow-sm">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-slate-600">ATM Strike:</span>
+          <span className="text-xl font-bold text-blue-700">{atmStrike}</span>
+        </div>
+        <div className="w-px bg-blue-300"></div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-slate-600">Spot Price:</span>
+          <span className="text-xl font-bold text-green-600">{spotPrice}</span>
+        </div>
       </div>
       <Table>
         <TableHeader>

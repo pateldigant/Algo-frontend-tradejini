@@ -17,9 +17,14 @@ function OpenOrdersTable({ orders, onCancel, onModify }) {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Open Orders ({orders.length})</CardTitle>
+    <Card className="shadow-md border-slate-200">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-xl font-bold text-slate-800">
+          Open Orders
+          <span className="ml-2 text-sm font-normal px-2 py-1 bg-blue-100 text-blue-700 rounded-full">
+            {orders.length}
+          </span>
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <Table>

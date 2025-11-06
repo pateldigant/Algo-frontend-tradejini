@@ -57,17 +57,35 @@ const PositionsTable = ({
 
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Live Positions</CardTitle>
-        <div className="flex justify-between items-center pt-2">
-            <div className="flex items-center space-x-2">
+    <Card className="shadow-md border-slate-200">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-xl font-bold text-slate-800">Live Positions</CardTitle>
+        <div className="flex justify-between items-center pt-3">
+            <div className={`flex items-center gap-3 px-3 py-2 rounded-lg border transition-all ${
+              showOnlyActive
+                ? 'bg-blue-50 border-blue-200'
+                : 'bg-slate-50 border-slate-200'
+            }`}>
                 <Switch id="active-positions" checked={showOnlyActive} onCheckedChange={setShowOnlyActive} />
-                <Label htmlFor="active-positions">Show only active</Label>
+                <Label
+                  htmlFor="active-positions"
+                  className={`font-medium cursor-pointer text-sm transition-colors ${
+                    showOnlyActive ? 'text-blue-700' : 'text-slate-600'
+                  }`}
+                >
+                  Show only active
+                </Label>
             </div>
-            <div className="flex items-center gap-2 w-32">
-                <Label htmlFor="pos-lots">Lots:</Label>
-                <Input id="pos-lots" type="number" value={positionLots} onChange={e => setPositionLots(Number(e.target.value))} min="1" className="h-8"/>
+            <div className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200">
+                <Label htmlFor="pos-lots" className="text-sm font-medium text-slate-600">Lots:</Label>
+                <Input
+                  id="pos-lots"
+                  type="number"
+                  value={positionLots}
+                  onChange={e => setPositionLots(Number(e.target.value))}
+                  min="1"
+                  className="h-8 w-20 text-center font-semibold border-slate-300 focus-visible:ring-blue-500"
+                />
             </div>
         </div>
       </CardHeader>
