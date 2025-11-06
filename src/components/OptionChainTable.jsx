@@ -61,9 +61,11 @@ function OptionChainTable({ optionChain, spotPrice, atmStrike, prevOptionChain, 
         <TableHeader>
           <TableRow>
             <TableHead className="text-center">Call OI</TableHead>
+            <TableHead className="text-center">Call IV</TableHead>
             <TableHead className="w-[180px] text-center">Call LTP / Trade</TableHead>
             <TableHead className="text-center bg-slate-100">Strike</TableHead>
             <TableHead className="w-[180px] text-center">Put LTP / Trade</TableHead>
+            <TableHead className="text-center">Put IV</TableHead>
             <TableHead className="text-center">Put OI</TableHead>
           </TableRow>
         </TableHeader>
@@ -71,9 +73,11 @@ function OptionChainTable({ optionChain, spotPrice, atmStrike, prevOptionChain, 
           {filteredChain.map((row) => (
             <TableRow key={row.strike} className={row.strike === atmStrike ? "bg-blue-50" : ""}>
               <TableCell className="text-center">{row.CE?.OI ?? "-"}</TableCell>
+              <TableCell className="text-center font-mono text-sm">{row.CE?.iv ? row.CE.iv.toFixed(2) : "-"}</TableCell>
               <TradeCell optionData={{ ...row.CE, strike: row.strike }} side="CE" />
               <TableCell className="font-bold text-center bg-slate-100">{row.strike}</TableCell>
               <TradeCell optionData={{ ...row.PE, strike: row.strike }} side="PE" />
+              <TableCell className="text-center font-mono text-sm">{row.PE?.iv ? row.PE.iv.toFixed(2) : "-"}</TableCell>
               <TableCell className="text-center">{row.PE?.OI ?? "-"}</TableCell>
             </TableRow>
           ))}
