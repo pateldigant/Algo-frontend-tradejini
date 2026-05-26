@@ -36,6 +36,20 @@ const StrategyView = () => {
    const hasCELevel = !!state.active_ce_level;
    const hasMarketStructure = state.market_structure !== 'NEUTRAL';
    const hasSignal = !!state.trade_signal;
+   const hasPendingOrder = !!state.pending_order;
+   const activeSetupType = state.active_setup?.type || null;
+   const preferredType =
+      state.market_structure === 'BULLISH'
+         ? 'LONG'
+         : state.market_structure === 'BEARISH'
+            ? 'SHORT'
+            : null;
+   const setupAlignment =
+      activeSetupType && preferredType
+         ? activeSetupType === preferredType
+            ? 'ALIGNED'
+            : 'COUNTER_TREND'
+         : null;
 
    // Pipeline Step Color Logic
    const getStepColor = (isActive, isComplete) => {
@@ -192,7 +206,11 @@ const StrategyView = () => {
                         </div>
                         {hasSignal ? (
                            <div className="text-xs mt-2 text-blue-600 font-bold">
-                              🎯 ZONE TESTED
+                              ORDER FILLED
+                           </div>
+                        ) : hasPendingOrder ? (
+                           <div className="text-xs mt-2 text-amber-600 font-bold">
+                              LIMIT PLACED
                            </div>
                         ) : (
                            <div className="text-xs mt-2 text-amber-600 animate-pulse">
@@ -226,8 +244,20 @@ const StrategyView = () => {
                         {state.market_structure === 'BULLISH' ? 'Higher Highs' : state.market_structure === 'BEARISH' ? 'Lower Lows' : 'No clear trend'}
                      </div>
                      {hasMarketStructure && (
-                        <div className="text-xs mt-2 text-slate-500">
-                           Trade {state.market_structure === 'BULLISH' ? 'LONG' : 'SHORT'} preferred
+                        <div className="text-xs mt-2 space-y-1">
+                           <div className="text-slate-500">
+                              Trade {state.market_structure === 'BULLISH' ? 'LONG' : 'SHORT'} preferred
+                           </div>
+                           {activeSetupType && setupAlignment === 'COUNTER_TREND' && (
+                              <div className="font-semibold text-amber-600">
+                                 Active setup: {activeSetupType} (counter-trend)
+                              </div>
+                           )}
+                           {activeSetupType && setupAlignment === 'ALIGNED' && (
+                              <div className="font-semibold text-green-600">
+                                 Active setup: {activeSetupType} (trend-aligned)
+                              </div>
+                           )}
                         </div>
                      )}
                   </div>
@@ -235,7 +265,7 @@ const StrategyView = () => {
             </Card>
 
             {/* Step 6: Entry Signal */}
-            <Card className={`border-2 ${getStepColor(hasCELevel, state.trade_signal?.status === 'OPEN')}`}>
+            <Card className={`border-2 ${getStepColor(hasCELevel || hasPendingOrder, state.trade_signal?.status === 'OPEN')}`}>
                <CardHeader className="pb-2">
                   <CardTitle className="text-xs uppercase tracking-wider flex items-center gap-1">
                      <CheckCircle className="w-3 h-3" /> Step 6: Signal
@@ -257,13 +287,67 @@ const StrategyView = () => {
                            {state.trade_signal.status}
                         </div>
                      </div>
+                  ) : state.pending_order ? (
+                     <div className="animate-in fade-in zoom-in duration-300">
+                        <div className={`font-bold text-sm ${state.pending_order.type === 'LONG' ? 'text-green-600' : 'text-red-600'}`}>
+                           {state.pending_order.type} LIMIT
+                        </div>
+                        <div className="text-xs text-slate-500 mb-1">
+                           {new Date(state.pending_order.created_at).toLocaleTimeString()}
+                        </div>
+                        <div className="space-y-1 text-xs font-mono">
+                           <div>EP: {state.pending_order.entry?.toFixed(1)}</div>
+                           <div>SL: {state.pending_order.sl?.toFixed(1)}</div>
+                           <div className="text-blue-600 font-bold">TP: {state.pending_order.tp?.toFixed(1)}</div>
+                        </div>
+                        <div className="text-xs mt-2 font-bold text-amber-600">
+                           PENDING
+                        </div>
+                     </div>
                   ) : (
-                     <div className="italic text-xs">No active signal</div>
+                     <div className="italic text-xs">No active or pending signal</div>
                   )}
                </CardContent>
             </Card>
 
          </div>
+
+         {state.pending_order && (
+            <Card className="border-2 border-amber-300 bg-amber-50">
+               <CardHeader>
+                  <CardTitle className="text-sm flex items-center gap-2">
+                     <AlertCircle className="w-4 h-4" />
+                     Pending Order Details
+                  </CardTitle>
+               </CardHeader>
+               <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                     <div>
+                        <div className="text-xs text-slate-600">Setup ID</div>
+                        <div className="font-mono text-xs break-all">{state.pending_order.setup_id}</div>
+                     </div>
+                     <div>
+                        <div className="text-xs text-slate-600">Order Type</div>
+                        <div className={`font-bold ${state.pending_order.type === 'LONG' ? 'text-green-600' : 'text-red-600'}`}>
+                           {state.pending_order.type} LIMIT
+                        </div>
+                     </div>
+                     <div>
+                        <div className="text-xs text-slate-600">Placed At</div>
+                        <div className="font-mono text-xs">
+                           {new Date(state.pending_order.created_at).toLocaleTimeString()}
+                        </div>
+                     </div>
+                     <div>
+                        <div className="text-xs text-slate-600">Expires At</div>
+                        <div className="font-mono text-xs">
+                           {new Date(state.pending_order.expires_at).toLocaleTimeString()}
+                        </div>
+                     </div>
+                  </div>
+               </CardContent>
+            </Card>
+         )}
 
          {/* Active Setup Details (if present) */}
          {state.active_setup && (
