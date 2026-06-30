@@ -1,9 +1,7 @@
 import Dashboard from "./pages/Dashboard";
-import StrategyView from "./pages/StrategyView";
 import { Toaster } from "./components/ui/toaster";
 import { ToastProvider } from "./components/ui/toast";
-import { TrendingUp, Activity, LayoutDashboard, BrainCircuit } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TrendingUp } from "lucide-react";
 
 function App() {
   return (
@@ -20,28 +18,7 @@ function App() {
               </h1>
             </div>
           </header>
-
-          <Tabs defaultValue="dashboard" className="w-full">
-            <div className="flex justify-center mb-6">
-              <TabsList className="grid w-full max-w-[400px] grid-cols-2">
-                <TabsTrigger value="dashboard" className="flex gap-2">
-                  <LayoutDashboard className="w-4 h-4" /> Live Data
-                </TabsTrigger>
-                <TabsTrigger value="strategy" className="flex gap-2">
-                  <BrainCircuit className="w-4 h-4" /> Strategy
-                </TabsTrigger>
-              </TabsList>
-            </div>
-
-            <TabsContent value="dashboard">
-              <Dashboard />
-            </TabsContent>
-
-            <TabsContent value="strategy">
-              <StrategyView />
-            </TabsContent>
-          </Tabs>
-
+          <Dashboard />
         </div>
         <Toaster />
       </main>
