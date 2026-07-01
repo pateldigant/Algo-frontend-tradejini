@@ -17,50 +17,50 @@ function OpenOrdersTable({ orders, onCancel, onModify }) {
   };
 
   return (
-    <Card className="shadow-md border-slate-200">
-      <CardHeader className="pb-3">
+    <Card className="terminal-shell border-0">
+      <CardHeader className="border-b border-slate-200/80 pb-4">
         <CardTitle className="text-xl font-bold text-slate-800">
           Open Orders
-          <span className="ml-2 text-sm font-normal px-2 py-1 bg-blue-100 text-blue-700 rounded-full">
+          <span className="ml-2 rounded-full bg-violet-100 px-2 py-1 text-sm font-normal text-violet-700">
             {orders.length}
           </span>
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-0">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead>Symbol</TableHead>
-              <TableHead className="text-center">Qty</TableHead>
-              <TableHead className="text-center">Side</TableHead>
-              <TableHead className="text-center">Type</TableHead> {/* <-- NEW COLUMN */}
-              <TableHead className="text-center">Price</TableHead>
-              <TableHead className="text-center">Trigger</TableHead>
-              <TableHead className="text-center">Status</TableHead>
-              <TableHead className="text-center">Actions</TableHead>
+            <TableRow className="bg-slate-50/80">
+              <TableHead className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Symbol</TableHead>
+              <TableHead className="text-center text-[11px] uppercase tracking-[0.18em] text-slate-500">Qty</TableHead>
+              <TableHead className="text-center text-[11px] uppercase tracking-[0.18em] text-slate-500">Side</TableHead>
+              <TableHead className="text-center text-[11px] uppercase tracking-[0.18em] text-slate-500">Type</TableHead>
+              <TableHead className="text-center text-[11px] uppercase tracking-[0.18em] text-slate-500">Price</TableHead>
+              <TableHead className="text-center text-[11px] uppercase tracking-[0.18em] text-slate-500">Trigger</TableHead>
+              <TableHead className="text-center text-[11px] uppercase tracking-[0.18em] text-slate-500">Status</TableHead>
+              <TableHead className="text-center text-[11px] uppercase tracking-[0.18em] text-slate-500">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {orders.length > 0 ? (
               orders.map((order) => (
                 <TableRow key={order.orderId}>
-                  <TableCell className="font-medium">{order.symId}</TableCell>
-                  <TableCell className="text-center">{order.qty}</TableCell>
+                  <TableCell className="font-medium text-slate-800">{order.symId}</TableCell>
+                  <TableCell className="terminal-metric text-center">{order.qty}</TableCell>
                   <TableCell className={`text-center font-bold ${order.side?.toLowerCase() === 'buy' ? 'text-green-600' : 'text-red-600'}`}>
                     {order.side?.toUpperCase()}
                   </TableCell>
                   <TableCell className="text-center text-xs font-semibold text-muted-foreground">
                     {order.type?.toUpperCase() || 'MARKET'}
-                  </TableCell> {/* <-- NEW CELL */}
-                  <TableCell className="text-center">{order.limitPrice > 0 ? order.limitPrice.toFixed(2) : "-"}</TableCell>
-                  <TableCell className="text-center">{order.trigPrice > 0 ? order.trigPrice.toFixed(2) : "-"}</TableCell>
+                  </TableCell>
+                  <TableCell className="terminal-metric text-center">{order.limitPrice > 0 ? order.limitPrice.toFixed(2) : "-"}</TableCell>
+                  <TableCell className="terminal-metric text-center">{order.trigPrice > 0 ? order.trigPrice.toFixed(2) : "-"}</TableCell>
                   <TableCell className="text-center">{getStatusBadge(order.status)}</TableCell>
                   <TableCell className="text-center">
                     <div className="flex justify-center gap-2">
-                      <Button variant="outline" size="sm" onClick={() => onModify(order)}>
+                      <Button variant="outline" size="sm" className="rounded-lg" onClick={() => onModify(order)}>
                         <Edit className="h-4 w-4 mr-1" /> Modify
                       </Button>
-                      <Button variant="destructive" size="sm" onClick={() => onCancel(order.orderId)}>
+                      <Button variant="destructive" size="sm" className="rounded-lg" onClick={() => onCancel(order.orderId)}>
                         <XCircle className="h-4 w-4 mr-1" /> Cancel
                       </Button>
                     </div>
@@ -69,7 +69,7 @@ function OpenOrdersTable({ orders, onCancel, onModify }) {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan="8" className="h-24 text-center"> {/* <-- Adjusted colSpan */}
+                <TableCell colSpan="8" className="h-24 text-center text-slate-500">
                   No open orders.
                 </TableCell>
               </TableRow>

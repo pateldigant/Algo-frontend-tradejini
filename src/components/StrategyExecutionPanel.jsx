@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -7,20 +7,18 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { Sparkles, ShieldAlert } from "lucide-react";
 
-// The panel now accepts orderLots as a prop
-const StrategyExecutionPanel = ({ orderLots, onExecute }) => {
-  const [strategy, setStrategy] = useState('strangle');
+const StrategyExecutionPanel = ({ orderLots, onExecute, selectedUnderlying = "NIFTY" }) => {
+  const [strategy, setStrategy] = useState("strangle");
   const [useHedges, setUseHedges] = useState(false);
   const [useStopLoss, setUseStopLoss] = useState(true);
-  
-  // State for parameters
   const [strikeDistance, setStrikeDistance] = useState(3);
   const [hedgeDistance, setHedgeDistance] = useState(5);
   const [slPercent, setSlPercent] = useState(25);
 
   const handleExecute = (strategyName) => {
-    const payload = {
+    onExecute({
       strategy: strategyName,
       lots: orderLots,
       strike_distance: strikeDistance,
@@ -29,73 +27,86 @@ const StrategyExecutionPanel = ({ orderLots, onExecute }) => {
       stop_loss: {
         enabled: useStopLoss,
         percent: slPercent,
-      }
-    };
-    // Call the handler passed from the parent
-    onExecute(payload);
+      },
+    });
   };
-  
+
   const handleSimpleExecute = (strategyName) => {
-     const payload = {
+    onExecute({
       strategy: strategyName,
       lots: orderLots,
-      stop_loss: { enabled: false } // No SL for simple scalp/buy by default
-    };
-    onExecute(payload);
-  }
+      stop_loss: { enabled: false },
+    });
+  };
 
-  // ... (renderStrategyParams function remains mostly the same, but now uses state)
   const renderStrategyParams = () => {
     switch (strategy) {
-      case 'strangle':
+      case "strangle":
         return (
           <>
             <div className="space-y-2">
-              <Label htmlFor="strike-distance">Strike Distance (from ATM)</Label>
+              <Label htmlFor="strike-distance">Strike Distance</Label>
               <Input id="strike-distance" type="number" value={strikeDistance} onChange={(e) => setStrikeDistance(Number(e.target.value))} />
             </div>
-            <div className="flex items-center space-x-2 pt-2">
+            <div className="flex items-center space-x-2 pt-1">
               <Checkbox id="buy-hedges" checked={useHedges} onCheckedChange={setUseHedges} />
               <Label htmlFor="buy-hedges">Buy Hedges</Label>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="hedge-distance" className={!useHedges ? 'text-muted-foreground' : ''}>Hedge Distance (from Short)</Label>
+              <Label htmlFor="hedge-distance" className={!useHedges ? "text-muted-foreground" : ""}>Hedge Distance</Label>
               <Input id="hedge-distance" type="number" value={hedgeDistance} onChange={(e) => setHedgeDistance(Number(e.target.value))} disabled={!useHedges} />
             </div>
           </>
         );
-      case 'straddle':
-        return <p className="text-sm text-muted-foreground">This strategy sells the ATM Call and Put.</p>;
+      case "straddle":
+        return <p className="text-sm text-muted-foreground">Sell the ATM call and put together.</p>;
       default:
         return null;
     }
   };
 
-
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Strategy Execution</CardTitle>
+    <Card className="terminal-shell border-0">
+      <CardHeader className="border-b border-slate-200/80 pb-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="terminal-section-title">Execution Rail</p>
+            <CardTitle className="mt-2 text-xl font-semibold text-slate-900">{selectedUnderlying} quick scalp and spread controls</CardTitle>
+          </div>
+          <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+            Lots {orderLots}
+          </div>
+        </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-5">
         <Tabs defaultValue="scalp">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="scalp">Quick Scalp</TabsTrigger>
-            <TabsTrigger value="strats">Spreads & Strats</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 rounded-xl bg-slate-100 p-1">
+            <TabsTrigger value="scalp" className="rounded-lg">Quick Scalp</TabsTrigger>
+            <TabsTrigger value="strats" className="rounded-lg">Spreads & Strats</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="scalp" className="pt-4">
-            <div className="grid grid-cols-2 gap-4">
-              <Button variant="outline" className="h-12" onClick={() => handleSimpleExecute('scalp_call')}>Scalp ATM Call</Button>
-              <Button variant="outline" className="h-12" onClick={() => handleSimpleExecute('scalp_put')}>Scalp ATM Put</Button>
+          <TabsContent value="scalp" className="space-y-4 pt-5">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+              <div className="mb-3 flex items-center gap-2 text-slate-700">
+                <Sparkles className="h-4 w-4" />
+                <p className="text-sm font-semibold">Fast directional entries</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Button variant="outline" className="h-14 rounded-xl border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50" onClick={() => handleSimpleExecute("scalp_call")}>
+                  Scalp ATM Call
+                </Button>
+                <Button variant="outline" className="h-14 rounded-xl border-rose-200 bg-white text-rose-700 hover:bg-rose-50" onClick={() => handleSimpleExecute("scalp_put")}>
+                  Scalp ATM Put
+                </Button>
+              </div>
             </div>
           </TabsContent>
 
-          <TabsContent value="strats" className="pt-4 space-y-4">
+          <TabsContent value="strats" className="space-y-4 pt-5">
             <div className="space-y-2">
-              <Label htmlFor="strategy-select">Select Strategy</Label>
+              <Label htmlFor="strategy-select">Strategy</Label>
               <Select onValueChange={setStrategy} defaultValue="strangle">
-                <SelectTrigger id="strategy-select">
+                <SelectTrigger id="strategy-select" className="rounded-xl">
                   <SelectValue placeholder="Select a strategy" />
                 </SelectTrigger>
                 <SelectContent>
@@ -104,27 +115,34 @@ const StrategyExecutionPanel = ({ orderLots, onExecute }) => {
                 </SelectContent>
               </Select>
             </div>
-            
+
             <Separator />
-            <div className="space-y-2">
-                <h4 className="text-sm font-semibold">Parameters</h4>
-                {renderStrategyParams()}
+
+            <div className="space-y-3">
+              <p className="text-sm font-semibold text-slate-800">Parameters</p>
+              {renderStrategyParams()}
             </div>
-            
+
             <Separator />
-            <div className="space-y-4">
-                <h4 className="text-sm font-semibold">Risk Management</h4>
-                <div className="flex items-center space-x-2">
-                    <Checkbox id="place-sl" checked={useStopLoss} onCheckedChange={setUseStopLoss} />
-                    <Label htmlFor="place-sl">Place Stop-Loss Order</Label>
-                </div>
-                <div className="space-y-2">
-                    <Label htmlFor="sl-percent" className={!useStopLoss ? 'text-muted-foreground' : ''}>SL Percentage (%)</Label>
-                    <Input id="sl-percent" type="number" value={slPercent} onChange={(e) => setSlPercent(Number(e.target.value))} disabled={!useStopLoss} />
-                </div>
+
+            <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
+              <div className="mb-3 flex items-center gap-2 text-amber-800">
+                <ShieldAlert className="h-4 w-4" />
+                <p className="text-sm font-semibold">Risk Management</p>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox id="place-sl" checked={useStopLoss} onCheckedChange={setUseStopLoss} />
+                <Label htmlFor="place-sl">Place Stop-Loss Order</Label>
+              </div>
+              <div className="mt-3 space-y-2">
+                <Label htmlFor="sl-percent" className={!useStopLoss ? "text-muted-foreground" : ""}>SL Percentage (%)</Label>
+                <Input id="sl-percent" type="number" value={slPercent} onChange={(e) => setSlPercent(Number(e.target.value))} disabled={!useStopLoss} />
+              </div>
             </div>
-            
-            <Button className="w-full" onClick={() => handleExecute(strategy)}>Execute Strategy</Button>
+
+            <Button className="h-12 w-full rounded-xl bg-slate-900 text-white hover:bg-slate-800" onClick={() => handleExecute(strategy)}>
+              Execute Strategy
+            </Button>
           </TabsContent>
         </Tabs>
       </CardContent>

@@ -1,29 +1,31 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 210 40% 98%;
+    --foreground: 218 38% 12%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 218 38% 12%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
+    --popover-foreground: 218 38% 12%;
+    --primary: 218 48% 19%;
     --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --secondary: 210 32% 95%;
+    --secondary-foreground: 218 38% 12%;
+    --muted: 210 28% 95%;
+    --muted-foreground: 215 18% 38%;
+    --accent: 203 64% 94%;
+    --accent-foreground: 218 48% 19%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-    --radius: 0.5rem;
+    --border: 213 28% 87%;
+    --input: 213 28% 87%;
+    --ring: 212 72% 48%;
+    --radius: 0.9rem;
   }
 
   .dark {
@@ -51,9 +53,32 @@
 
 @layer base {
   body {
-    /* Use CSS variables directly instead of @apply */
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
     font-feature-settings: "rlig" 1, "calt" 1;
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    background-image:
+      radial-gradient(circle at top left, rgba(14, 116, 144, 0.08), transparent 22%),
+      radial-gradient(circle at top right, rgba(15, 23, 42, 0.06), transparent 20%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(241, 245, 249, 0.98));
+    min-height: 100vh;
+  }
+
+  * {
+    border-color: hsl(var(--border));
+  }
+}
+
+@layer components {
+  .terminal-shell {
+    @apply rounded-[28px] border border-slate-200/80 bg-white/80 shadow-[0_18px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl;
+  }
+
+  .terminal-section-title {
+    @apply text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500;
+  }
+
+  .terminal-metric {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
   }
 }
