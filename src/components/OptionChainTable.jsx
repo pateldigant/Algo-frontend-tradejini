@@ -78,11 +78,20 @@ function OptionChainTable({ optionChain, spotPrice, atmStrike, prevOptionChain, 
         </TableHeader>
         <TableBody>
           {filteredChain.map((row) => (
-            <TableRow key={row.strike} className={row.strike === atmStrike ? "bg-blue-50" : ""}>
+            <TableRow
+              key={row.strike}
+              className={row.strike === atmStrike ? "bg-blue-100/90 shadow-[inset_0_0_0_1px_rgba(59,130,246,0.22)]" : ""}
+            >
               <TableCell className="text-center">{row.CE?.OI ?? "-"}</TableCell>
               <TableCell className="text-center font-mono text-sm">{row.CE?.iv ? row.CE.iv.toFixed(2) : "-"}</TableCell>
               <TradeCell optionData={{ ...row.CE, strike: row.strike }} side="CE" />
-              <TableCell className="font-bold text-center bg-slate-100">{row.strike}</TableCell>
+              <TableCell
+                className={`font-bold text-center ${
+                  row.strike === atmStrike ? "bg-blue-200/90 text-blue-950" : "bg-slate-100"
+                }`}
+              >
+                {row.strike}
+              </TableCell>
               <TradeCell optionData={{ ...row.PE, strike: row.strike }} side="PE" />
               <TableCell className="text-center font-mono text-sm">{row.PE?.iv ? row.PE.iv.toFixed(2) : "-"}</TableCell>
               <TableCell className="text-center">{row.PE?.OI ?? "-"}</TableCell>

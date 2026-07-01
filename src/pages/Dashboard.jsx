@@ -34,17 +34,28 @@ function Dashboard() {
   const [selectedPositions, setSelectedPositions] = useState(new Set());
   const [isBasketMode, setIsBasketMode] = useState(false);
   const [isFastMode, setIsFastMode] = useState(false); 
+  const [isPaperMode, setIsPaperMode] = useState(() => window.localStorage.getItem("paperMode") === "true");
   const [basket, setBasket] = useState([]);
   const [showOnlyActive, setShowOnlyActive] = useState(true);
 
+  const tradingMode = isPaperMode ? "paper" : "real";
+
   const { toast } = useToast();
+
+  const setPendingOrdersOnly = (orders) => {
+    if (Array.isArray(orders)) {
+      setOpenOrders(orders.filter((o) => ["open", "trigger_pending"].includes(o.status?.toLowerCase())));
+    } else {
+      setOpenOrders([]);
+    }
+  };
 
   const handleExecuteStrategy = async (strategyDetails) => {
     try {
       const response = await fetch("http://localhost:8000/api/execute-strategy", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(strategyDetails),
+        body: JSON.stringify({ ...strategyDetails, mode: tradingMode }),
       });
       const result = await response.json();
       if (response.ok) {
@@ -59,7 +70,8 @@ function Dashboard() {
 
   const fetchData = async (url, setter) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/${url}`);
+      const modeQuery = url === "latest" ? "" : `?mode=${tradingMode}`;
+      const response = await fetch(`http://localhost:8000/api/${url}${modeQuery}`);
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const result = await response.json();
       if (result.s === "ok") {
@@ -88,7 +100,7 @@ function Dashboard() {
         const response = await fetch(`http://localhost:8000/api/${url}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
+            body: JSON.stringify({ ...body, mode: tradingMode }),
         });
         const result = await response.json();
         if (response.ok) {
@@ -102,34 +114,34 @@ function Dashboard() {
         setModalState({ type: null, data: null });
         setTimeout(() => {
             fetchData("enriched-positions", setPositions);
-            fetchData("orderbook", setOpenOrders);
+            fetchData("orderbook", setPendingOrdersOnly);
         }, 500);
     }
   };
+  useEffect(() => {
+    window.localStorage.setItem("paperMode", String(isPaperMode));
+    setSelectedPositions(new Set());
+  }, [isPaperMode]);
+
   useEffect(() => {
     const initialFetch = () => {
       fetchSnapshot();
       fetchData("enriched-positions", setPositions);
       fetchData("funds", (d) => setFunds({d}));
-      fetchData("orderbook", setOpenOrders);
+      fetchData("orderbook", setPendingOrdersOnly);
     };
     initialFetch();
     const id1 = setInterval(fetchSnapshot, POLLING_INTERVAL_MS);
     const id2 = setInterval(() => fetchData("enriched-positions", setPositions), POLLING_INTERVAL_MS);
     const id3 = setInterval(() => fetchData("funds", (d) => setFunds({d})), POLLING_INTERVAL_MS * 2);
-    const id4 = setInterval(() => fetchData("orderbook", (d) => {
-      if(Array.isArray(d)) {
-        const pending = d.filter(o => ["open", "trigger_pending"].includes(o.status?.toLowerCase()));
-        setOpenOrders(pending);
-      }
-    }), POLLING_INTERVAL_MS);
+    const id4 = setInterval(() => fetchData("orderbook", setPendingOrdersOnly), POLLING_INTERVAL_MS);
     return () => {
       clearInterval(id1);
       clearInterval(id2);
       clearInterval(id3);
       clearInterval(id4);
     };
-  }, []);
+  }, [tradingMode]);
   const handleInitiateOrder = (orderData, lots) => {
     const tradeLots = lots || 1;
     const order = { ...orderData, lots: tradeLots, quantity: tradeLots * orderData.lot };
@@ -177,6 +189,55 @@ function Dashboard() {
   const handleCancelOrder = (orderId) => {
     postRequest("cancel-order", { orderId }, "Order cancelled.", "Failed to cancel order.");
   };
+  const handlePlacePositionStopLoss = ({ triggerPrice, limitPrice }) => {
+    const position = modalState.data;
+    const parsedTrigger = parseFloat(triggerPrice);
+    if (!position || !Number.isFinite(parsedTrigger) || parsedTrigger <= 0) {
+      toast({ variant: "destructive", title: "Invalid Trigger", description: "Enter a valid stop-loss trigger price." });
+      return;
+    }
+
+    const side = position.netQty > 0 ? "SELL" : "BUY";
+    if (position.mode === "paper") {
+      postRequest(
+        "place-order",
+        {
+          symId: position.symId,
+          qty: Math.abs(position.netQty),
+          side,
+          type: "stopmarket",
+          trigPrice: parsedTrigger,
+          product: position.product || "normal",
+          validity: "day",
+        },
+        "Paper stop-loss placed.",
+        "Failed to place paper stop-loss."
+      );
+      return;
+    }
+
+    const parsedLimit = parseFloat(limitPrice);
+    if (!Number.isFinite(parsedLimit) || parsedLimit <= 0) {
+      toast({ variant: "destructive", title: "Invalid Limit", description: "Enter a valid stop-loss limit price." });
+      return;
+    }
+
+    postRequest(
+      "place-order",
+      {
+        symId: position.symId,
+        qty: Math.abs(position.netQty),
+        side,
+        type: "stoplimit",
+        trigPrice: parsedTrigger,
+        limitPrice: parsedLimit,
+        product: position.product || "normal",
+        validity: "day",
+      },
+      "Real stop-loss placed.",
+      "Failed to place real stop-loss."
+    );
+  };
   const handleExecuteBasket = () => {
       // Transform basket orders to the correct format for backend
       const formattedOrders = basket.map(order => ({
@@ -205,7 +266,9 @@ function Dashboard() {
         isBasketMode={isBasketMode}
         setIsBasketMode={setIsBasketMode}
         isFastMode={isFastMode}       
-        setIsFastMode={setIsFastMode} 
+        setIsFastMode={setIsFastMode}
+        isPaperMode={isPaperMode}
+        setIsPaperMode={setIsPaperMode}
       />
       
       <ResizablePanelGroup
@@ -233,6 +296,7 @@ function Dashboard() {
               }}
               onExitSelected={() => setModalState({ type: 'confirmBulkSquareOff', data: null })}
               onExitAll={() => setModalState({ type: 'confirmLiquidate', data: null })}
+              onPlaceStopLoss={(position) => setModalState({ type: 'placePositionStopLoss', data: { ...position, mode: tradingMode } })}
             />
             <OpenOrdersTable
               orders={openOrders}
@@ -291,6 +355,7 @@ function Dashboard() {
           handleLiquidatePortfolio,
           handleModifyOrder,
           handleExecuteBasket,
+          handlePlacePositionStopLoss,
         }}
         basket={basket}
         selectedPositions={selectedPositions}

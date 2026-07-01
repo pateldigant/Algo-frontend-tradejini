@@ -10,7 +10,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 const PositionsTable = ({
   positions, allPositions, showOnlyActive, setShowOnlyActive,
   positionLots, setPositionLots, selectedPositions,
-  setSelectedPositions, onPlaceOrder, onExit, onExitSelected, onExitAll
+  setSelectedPositions, onPlaceOrder, onExit, onExitSelected, onExitAll,
+  onPlaceStopLoss
 }) => {
 
   const handleSelectionChange = (symId) => {
@@ -141,6 +142,11 @@ const PositionsTable = ({
                                 <div className="flex justify-end gap-1">
                                     <Button size="sm" variant="outline" className="h-7" onClick={() => onPlaceOrder({ symId: p.symId, lot: p.lot, side: 'BUY' }, positionLots)}>B</Button>
                                     <Button size="sm" variant="outline" className="h-7" onClick={() => onPlaceOrder({ symId: p.symId, lot: p.lot, side: 'SELL' }, positionLots)}>S</Button>
+                                    {p.netQty !== 0 && (
+                                      <Button size="sm" variant="outline" className="h-7" onClick={() => onPlaceStopLoss(p)}>
+                                        SL
+                                      </Button>
+                                    )}
                                     <Button variant="secondary" size="sm" className="h-7" onClick={() => onExit(p)}>Exit</Button>
                                 </div>
                             </TableCell>

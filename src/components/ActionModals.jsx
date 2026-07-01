@@ -15,17 +15,24 @@ import { Label } from "./ui/label";
 const ActionModals = ({ modalState, onClose, actions, basket, selectedPositions }) => {
   const [modifyPrice, setModifyPrice] = useState("");
   const [modifyTrigger, setModifyTrigger] = useState("");
+  const [positionStopTrigger, setPositionStopTrigger] = useState("");
+  const [positionStopLimit, setPositionStopLimit] = useState("");
 
   useEffect(() => {
     if (modalState.type === 'modifyOrder' && modalState.data) {
       setModifyPrice(modalState.data.limitPrice || "");
-      setModifyTrigger(modalState.data.stopPrice || "");
+      setModifyTrigger(modalState.data.trigPrice || "");
+    }
+    if (modalState.type === 'placePositionStopLoss' && modalState.data) {
+      setPositionStopTrigger("");
+      setPositionStopLimit("");
     }
   }, [modalState]);
 
   const {
     handleConfirmOrder, handleSquareOff, handleBulkSquareOff,
-    handleLiquidatePortfolio, handleModifyOrder, handleExecuteBasket
+    handleLiquidatePortfolio, handleModifyOrder, handleExecuteBasket,
+    handlePlacePositionStopLoss
   } = actions;
   
   const isOpen = (type) => modalState.type === type;
@@ -78,6 +85,57 @@ const ActionModals = ({ modalState, onClose, actions, basket, selectedPositions 
           <DialogFooter>
             <Button variant="outline" onClick={onClose}>Cancel</Button>
             <Button onClick={() => handleModifyOrder({ price: modifyPrice, triggerPrice: modifyTrigger })}>Confirm Modification</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isOpen('placePositionStopLoss')} onOpenChange={onClose}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{modalState.data?.mode === "paper" ? "Place Paper Stop-Loss" : "Place Real Stop-Loss"}</DialogTitle>
+            <DialogDescription className="text-foreground">
+              {modalState.data?.mode === "paper"
+                ? "Create a virtual stop order for the full paper position."
+                : "Create a stop-loss limit order for the full real position."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-4">
+            <p><strong>Instrument:</strong> {modalState.data?.symId}</p>
+            <p><strong>Net Qty:</strong> {modalState.data?.netQty}</p>
+            <p><strong>Avg Price:</strong> {modalState.data?.netAvgPrice?.toFixed?.(2) ?? modalState.data?.netAvgPrice}</p>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="position-stop-trigger" className="text-right">Trigger</Label>
+              <Input
+                id="position-stop-trigger"
+                value={positionStopTrigger}
+                onChange={(e) => setPositionStopTrigger(e.target.value)}
+                className="col-span-3"
+                placeholder="50"
+              />
+            </div>
+            {modalState.data?.mode === "real" && (
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="position-stop-limit" className="text-right">Limit</Label>
+                <Input
+                  id="position-stop-limit"
+                  value={positionStopLimit}
+                  onChange={(e) => setPositionStopLimit(e.target.value)}
+                  className="col-span-3"
+                  placeholder="49.50"
+                />
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              {modalState.data?.mode === "paper"
+                ? "For a long position, the paper stop will trigger when LTP is less than or equal to the trigger price."
+                : "For a long position, use a sell stop-loss with trigger above the limit price. For a short position, use a buy stop-loss with trigger below the limit price."}
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={onClose}>Cancel</Button>
+            <Button onClick={() => handlePlacePositionStopLoss({ triggerPrice: positionStopTrigger, limitPrice: positionStopLimit })}>
+              Place Stop-Loss
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

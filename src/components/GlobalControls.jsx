@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { ShoppingCart, Zap, Hash, Target } from "lucide-react";
+import { ShoppingCart, Zap, Hash, Target, FileText } from "lucide-react";
 
 const GlobalControls = ({
   orderLots,
@@ -14,7 +14,9 @@ const GlobalControls = ({
   isBasketMode,
   setIsBasketMode,
   isFastMode,
-  setIsFastMode
+  setIsFastMode,
+  isPaperMode,
+  setIsPaperMode
 }) => {
   return (
     <Card className="shadow-md border-slate-200">
@@ -82,6 +84,31 @@ const GlobalControls = ({
                   id="basket-mode"
                   checked={isBasketMode}
                   onCheckedChange={setIsBasketMode}
+                />
+              </div>
+            </div>
+
+            <div className={`flex items-center gap-3 px-4 py-3 rounded-lg border-2 transition-all ${
+              isPaperMode
+                ? 'bg-emerald-50 border-emerald-200'
+                : 'bg-slate-50 border-slate-200'
+            }`}>
+              <FileText className={`h-5 w-5 transition-colors ${
+                isPaperMode ? 'text-emerald-600' : 'text-slate-500'
+              }`} />
+              <div className="flex flex-col gap-1">
+                <Label
+                  htmlFor="paper-mode"
+                  className={`text-xs font-medium cursor-pointer transition-colors ${
+                    isPaperMode ? 'text-emerald-700' : 'text-slate-600'
+                  }`}
+                >
+                  Paper Mode
+                </Label>
+                <Switch
+                  id="paper-mode"
+                  checked={isPaperMode}
+                  onCheckedChange={setIsPaperMode}
                 />
               </div>
             </div>
