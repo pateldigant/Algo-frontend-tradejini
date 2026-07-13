@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ShoppingCart, Zap, Hash, Target, FileText, ChartCandlestick } from "lucide-react";
+import { AlarmClock, ShoppingCart, Zap, Hash, Target, FileText, ChartCandlestick } from "lucide-react";
 
 const modeCards = [
   {
@@ -29,6 +29,13 @@ const modeCards = [
     activeClasses: "border-amber-300 bg-amber-50 text-amber-800",
     inactiveClasses: "border-slate-200 bg-white text-slate-600",
   },
+  {
+    key: "autoSquareoff",
+    label: "Auto Squareoff",
+    icon: AlarmClock,
+    activeClasses: "border-rose-300 bg-rose-50 text-rose-800",
+    inactiveClasses: "border-slate-200 bg-white text-slate-600",
+  },
 ];
 
 const GlobalControls = ({
@@ -42,6 +49,8 @@ const GlobalControls = ({
   setIsFastMode,
   isPaperMode,
   setIsPaperMode,
+  isSquareoffBeforeCloseEnabled,
+  setIsSquareoffBeforeCloseEnabled,
   selectedUnderlying,
   setSelectedUnderlying,
 }) => {
@@ -106,17 +115,28 @@ const GlobalControls = ({
 
           <Separator orientation="vertical" className="hidden h-16 bg-slate-300 xl:block" />
 
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
             {modeCards.map((card) => {
               const isActive =
                 (card.key === "basket" && isBasketMode) ||
                 (card.key === "paper" && isPaperMode) ||
-                (card.key === "fast" && isFastMode);
+                (card.key === "fast" && isFastMode) ||
+                (card.key === "autoSquareoff" && isSquareoffBeforeCloseEnabled);
               const Icon = card.icon;
-              const checked =
-                card.key === "basket" ? isBasketMode : card.key === "paper" ? isPaperMode : isFastMode;
-              const onCheckedChange =
-                card.key === "basket" ? setIsBasketMode : card.key === "paper" ? setIsPaperMode : setIsFastMode;
+              const checked = card.key === "basket"
+                ? isBasketMode
+                : card.key === "paper"
+                  ? isPaperMode
+                  : card.key === "fast"
+                    ? isFastMode
+                    : isSquareoffBeforeCloseEnabled;
+              const onCheckedChange = card.key === "basket"
+                ? setIsBasketMode
+                : card.key === "paper"
+                  ? setIsPaperMode
+                  : card.key === "fast"
+                    ? setIsFastMode
+                    : setIsSquareoffBeforeCloseEnabled;
 
               return (
                 <div
@@ -132,11 +152,6 @@ const GlobalControls = ({
                         <Label htmlFor={`${card.key}-mode`} className="text-sm font-semibold cursor-pointer">
                           {card.label}
                         </Label>
-                        <p className="mt-1 text-xs text-slate-500">
-                          {card.key === "basket" && "Queue multiple orders before execution"}
-                          {card.key === "paper" && "Route orders into the virtual book"}
-                          {card.key === "fast" && "Bypass confirmation for quick execution"}
-                        </p>
                       </div>
                     </div>
                     <Switch id={`${card.key}-mode`} checked={checked} onCheckedChange={onCheckedChange} />

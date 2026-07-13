@@ -8,6 +8,27 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 
+const MONTH_FORMATTER = new Intl.DateTimeFormat("en-IN", { month: "long" });
+
+function formatDisplaySymbol(symId) {
+  if (typeof symId !== "string") return "-";
+  const parts = symId.split("_");
+  const optionType = parts[parts.length - 1];
+  const strike = parts[parts.length - 2];
+  const expiry = parts[parts.length - 3];
+  const index = parts[1];
+
+  if (!index || !expiry || !strike || !["CE", "PE"].includes(optionType)) {
+    return symId;
+  }
+
+  const expiryDate = new Date(`${expiry}T00:00:00`);
+  const displayExpiry = Number.isNaN(expiryDate.getTime())
+    ? expiry
+    : `${expiryDate.getDate()} ${MONTH_FORMATTER.format(expiryDate)}`;
+  return `${index} ${displayExpiry} ${strike} ${optionType}`;
+}
+
 const PositionsTable = ({
   positions,
   allPositions,
@@ -22,6 +43,8 @@ const PositionsTable = ({
   onExitSelected,
   onExitAll,
   onPlaceStopLoss,
+  onPlaceTakeProfit,
+  takeProfitTriggers = {},
   openOrders = [],
   tradingMode = "real",
 }) => {
@@ -145,21 +168,21 @@ const PositionsTable = ({
 
       <CardContent className="p-0">
         <div className="max-h-[440px] overflow-y-auto">
-          <Table>
+          <Table className="min-w-[860px] table-fixed">
             <TableHeader>
               <TableRow className="bg-slate-50/80">
-                <TableHead className="w-[50px]">
+                <TableHead className="w-[36px]">
                   <Checkbox onCheckedChange={handleSelectAll} checked={positions.length > 0 && selectedPositions.size === positions.length} />
                 </TableHead>
-                <TableHead className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Symbol</TableHead>
-                <TableHead className="text-center text-[11px] uppercase tracking-[0.18em] text-slate-500">Bias</TableHead>
-                <TableHead className="text-center text-[11px] uppercase tracking-[0.18em] text-slate-500">Lots</TableHead>
-                <TableHead className="text-center text-[11px] uppercase tracking-[0.18em] text-slate-500">Qty</TableHead>
-                <TableHead className="text-center text-[11px] uppercase tracking-[0.18em] text-slate-500">Avg</TableHead>
-                <TableHead className="text-center text-[11px] uppercase tracking-[0.18em] text-slate-500">LTP</TableHead>
-                <TableHead className="text-center text-[11px] uppercase tracking-[0.18em] text-slate-500">PnL</TableHead>
-                <TableHead className="text-center text-[11px] uppercase tracking-[0.18em] text-slate-500">Protection</TableHead>
-                <TableHead className="text-right text-[11px] uppercase tracking-[0.18em] text-slate-500">Actions</TableHead>
+                <TableHead className="w-[190px] text-[11px] uppercase tracking-[0.18em] text-slate-500">Symbol</TableHead>
+                <TableHead className="w-[74px] text-center text-[11px] uppercase tracking-[0.18em] text-slate-500">Bias</TableHead>
+                <TableHead className="w-[56px] text-center text-[11px] uppercase tracking-[0.18em] text-slate-500">Lots</TableHead>
+                <TableHead className="w-[62px] text-center text-[11px] uppercase tracking-[0.18em] text-slate-500">Qty</TableHead>
+                <TableHead className="w-[78px] text-center text-[11px] uppercase tracking-[0.18em] text-slate-500">Avg</TableHead>
+                <TableHead className="w-[70px] text-center text-[11px] uppercase tracking-[0.18em] text-slate-500">LTP</TableHead>
+                <TableHead className="w-[82px] text-center text-[11px] uppercase tracking-[0.18em] text-slate-500">PnL</TableHead>
+                <TableHead className="w-[112px] text-center text-[11px] uppercase tracking-[0.18em] text-slate-500">Protection</TableHead>
+                <TableHead className="w-[200px] text-right text-[11px] uppercase tracking-[0.18em] text-slate-500">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -167,9 +190,12 @@ const PositionsTable = ({
                 positions.map((p) => {
                   const pnlValue = p.netQty === 0 ? p.realizedPnl : p.unrealizedPnlLive;
                   const isLong = (p.netQty ?? 0) > 0;
-                  const isShort = (p.netQty ?? 0) < 0;
                   const symbolOrders = orderMap.get(p.symId) || [];
                   const stopOrders = symbolOrders.filter((order) => String(order.type || "").toLowerCase().includes("stop"));
+                  const takeProfit = takeProfitTriggers[p.symId];
+                  const takeProfitPrice = Number(takeProfit?.triggerPrice);
+                  const hasTakeProfit = Number.isFinite(takeProfitPrice) && takeProfit?.mode === tradingMode;
+                  const displaySymbol = formatDisplaySymbol(p.symId);
 
                   return (
                     <TableRow key={p.symId} className={selectedPositions.has(p.symId) ? "bg-sky-50/40" : ""}>
@@ -177,7 +203,7 @@ const PositionsTable = ({
                         <Checkbox checked={selectedPositions.has(p.symId)} onCheckedChange={() => handleSelectionChange(p.symId)} />
                       </TableCell>
                       <TableCell className="font-medium text-slate-800">
-                        <div className="max-w-[260px] truncate">{p.symId}</div>
+                        <div className="truncate" title={p.symId}>{displaySymbol}</div>
                       </TableCell>
                       <TableCell className="text-center">
                         {p.netQty === 0 ? (
@@ -199,28 +225,47 @@ const PositionsTable = ({
                         {pnlValue?.toFixed(2) ?? "-"}
                       </TableCell>
                       <TableCell className="text-center">
-                        {stopOrders.length > 0 ? (
-                          <Badge variant="outline" className="border-violet-300 bg-violet-100 text-violet-900">
-                            SL Pending
-                          </Badge>
-                        ) : p.netQty !== 0 ? (
-                          <Badge variant="outline" className="border-amber-300 bg-amber-100 text-amber-900">
-                            Unhedged
-                          </Badge>
-                        ) : (
-                          <span className="text-slate-400">-</span>
-                        )}
+                        <div className="flex flex-wrap justify-center gap-1">
+                          {stopOrders.length > 0 && (
+                            <Badge variant="outline" className="border-violet-300 bg-violet-100 text-violet-900">
+                              SL Pending
+                            </Badge>
+                          )}
+                          {hasTakeProfit && (
+                            <Badge variant="outline" className="border-sky-300 bg-sky-100 text-sky-900">
+                              TP {takeProfitPrice.toFixed(2)}
+                            </Badge>
+                          )}
+                          {stopOrders.length === 0 && !hasTakeProfit && p.netQty !== 0 && (
+                            <Badge variant="outline" className="border-amber-300 bg-amber-100 text-amber-900">
+                              Unhedged
+                            </Badge>
+                          )}
+                          {p.netQty === 0 && stopOrders.length === 0 && !hasTakeProfit && (
+                            <span className="text-slate-400">-</span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button size="sm" variant="outline" className="h-8 rounded-lg border-emerald-200 px-2 text-emerald-700 hover:bg-emerald-50" onClick={() => onPlaceOrder({ symId: p.symId, lot: p.lot, side: "BUY" }, positionLots)}>B</Button>
-                          <Button size="sm" variant="outline" className="h-8 rounded-lg border-rose-200 px-2 text-rose-700 hover:bg-rose-50" onClick={() => onPlaceOrder({ symId: p.symId, lot: p.lot, side: "SELL" }, positionLots)}>S</Button>
+                        <div className="flex justify-end gap-1 whitespace-nowrap">
+                          <Button size="sm" variant="outline" className="h-8 w-8 rounded-lg border-emerald-200 p-0 text-emerald-700 hover:bg-emerald-50" onClick={() => onPlaceOrder({ symId: p.symId, lot: p.lot, side: "BUY" }, positionLots)}>B</Button>
+                          <Button size="sm" variant="outline" className="h-8 w-8 rounded-lg border-rose-200 p-0 text-rose-700 hover:bg-rose-50" onClick={() => onPlaceOrder({ symId: p.symId, lot: p.lot, side: "SELL" }, positionLots)}>S</Button>
                           {p.netQty !== 0 && (
-                            <Button size="sm" variant="outline" className="h-8 rounded-lg border-violet-200 px-2 text-violet-700 hover:bg-violet-50" onClick={() => onPlaceStopLoss(p)}>
-                              SL
-                            </Button>
+                            <>
+                              <Button size="sm" variant="outline" className="h-8 w-9 rounded-lg border-violet-200 p-0 text-violet-700 hover:bg-violet-50" onClick={() => onPlaceStopLoss(p)}>
+                                SL
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 w-9 rounded-lg border-sky-200 p-0 text-sky-700 hover:bg-sky-50"
+                                onClick={() => onPlaceTakeProfit(p)}
+                              >
+                                TP
+                              </Button>
+                            </>
                           )}
-                          <Button variant="secondary" size="sm" className="h-8 rounded-lg" onClick={() => onExit(p)}>
+                          <Button variant="secondary" size="sm" className="h-8 rounded-lg px-2.5" onClick={() => onExit(p)}>
                             Exit
                           </Button>
                         </div>

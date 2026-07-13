@@ -9,13 +9,37 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Sparkles, ShieldAlert } from "lucide-react";
 
-const StrategyExecutionPanel = ({ orderLots, onExecute, selectedUnderlying = "NIFTY" }) => {
+const StrategyExecutionPanel = ({ orderLots, onExecute, selectedUnderlying = "NIFTY", scalpBuyingPower = null }) => {
   const [strategy, setStrategy] = useState("strangle");
   const [useHedges, setUseHedges] = useState(false);
   const [useStopLoss, setUseStopLoss] = useState(true);
   const [strikeDistance, setStrikeDistance] = useState(3);
   const [hedgeDistance, setHedgeDistance] = useState(5);
   const [slPercent, setSlPercent] = useState(25);
+  const [scalpSlPoints, setScalpSlPoints] = useState("");
+  const [scalpTpPoints, setScalpTpPoints] = useState("");
+
+  const parseOptionalPoints = (value) => {
+    if (value === "") return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  };
+
+  const formatCurrency = (value) => {
+    if (!Number.isFinite(value)) return "--";
+    return new Intl.NumberFormat("en-IN", {
+      maximumFractionDigits: 0,
+      minimumFractionDigits: 0,
+    }).format(value);
+  };
+
+  const formatPrice = (value) => {
+    if (!Number.isFinite(value)) return "--";
+    return new Intl.NumberFormat("en-IN", {
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 2,
+    }).format(value);
+  };
 
   const handleExecute = (strategyName) => {
     onExecute({
@@ -36,8 +60,29 @@ const StrategyExecutionPanel = ({ orderLots, onExecute, selectedUnderlying = "NI
       strategy: strategyName,
       lots: orderLots,
       stop_loss: { enabled: false },
+      scalp_sl_points: parseOptionalPoints(scalpSlPoints),
+      scalp_tp_points: parseOptionalPoints(scalpTpPoints),
     });
   };
+
+  const renderScalpBuyingPower = (label, data, tone) => (
+    <div className={`rounded-xl border bg-white px-3 py-2.5 shadow-sm ${tone}`}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-sm font-semibold">{label}</div>
+        <div className="terminal-metric text-xs text-slate-500">@ {formatPrice(data?.ltp)}</div>
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <div>
+          <div className="terminal-section-title text-current/60">Required</div>
+          <div className="terminal-metric mt-1 text-sm font-semibold">Rs {formatCurrency(data?.requiredMargin)}</div>
+        </div>
+        <div className="text-right">
+          <div className="terminal-section-title text-current/60">Max Lots</div>
+          <div className="terminal-metric mt-1 text-sm font-semibold">{Number.isFinite(data?.maxLots) ? data.maxLots : "--"}</div>
+        </div>
+      </div>
+    </div>
+  );
 
   const renderStrategyParams = () => {
     switch (strategy) {
@@ -98,6 +143,36 @@ const StrategyExecutionPanel = ({ orderLots, onExecute, selectedUnderlying = "NI
                 <Button variant="outline" className="h-14 rounded-xl border-rose-200 bg-white text-rose-700 hover:bg-rose-50" onClick={() => handleSimpleExecute("scalp_put")}>
                   Scalp ATM Put
                 </Button>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                {renderScalpBuyingPower("ATM Call", scalpBuyingPower?.call, "border-emerald-200 text-emerald-900")}
+                {renderScalpBuyingPower("ATM Put", scalpBuyingPower?.put, "border-rose-200 text-rose-900")}
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="scalp-sl-points">SL Points</Label>
+                  <Input
+                    id="scalp-sl-points"
+                    type="number"
+                    min="0"
+                    step="0.05"
+                    value={scalpSlPoints}
+                    onChange={(e) => setScalpSlPoints(e.target.value)}
+                    className="h-10 rounded-xl bg-white"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="scalp-tp-points">TP Points</Label>
+                  <Input
+                    id="scalp-tp-points"
+                    type="number"
+                    min="0"
+                    step="0.05"
+                    value={scalpTpPoints}
+                    onChange={(e) => setScalpTpPoints(e.target.value)}
+                    className="h-10 rounded-xl bg-white"
+                  />
+                </div>
               </div>
             </div>
           </TabsContent>

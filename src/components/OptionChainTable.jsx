@@ -16,6 +16,8 @@ function OptionChainTable({
   onPlaceOrder,
   positions = [],
   openOrders = [],
+  watchedSymbols = [],
+  onToggleWatch,
 }) {
   const prevLtpMap = useMemo(() => {
     if (!prevOptionChain) return new Map();
@@ -81,6 +83,7 @@ function OptionChainTable({
     const prevLtp = prevLtpMap.get(optionData?.strike)?.[`${side}_ltp`];
     const rising = prevLtp !== undefined && prevLtp !== null && ltp > prevLtp;
     const { hasPosition, hasOrder, position } = deriveMarkers(optionData);
+    const isWatched = watchedSymbols.includes(optionData?.symId);
 
     if (!optionData || !optionData.symId) {
       return <TableCell className="text-center text-slate-400">-</TableCell>;
@@ -116,6 +119,14 @@ function OptionChainTable({
             </Button>
             <Button size="sm" variant="outline" className="h-7 rounded-lg border-rose-200 px-2 text-rose-700 hover:bg-rose-50" onClick={() => onPlaceOrder({ ...optionData, side: "SELL" })}>
               S
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className={`h-7 rounded-lg px-2 ${isWatched ? "border-sky-300 bg-sky-100 text-sky-900 hover:bg-sky-100" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}
+              onClick={() => onToggleWatch?.(optionData.symId)}
+            >
+              W
             </Button>
           </div>
         </div>

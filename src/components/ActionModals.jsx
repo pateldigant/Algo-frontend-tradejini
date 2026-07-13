@@ -17,6 +17,7 @@ const ActionModals = ({ modalState, onClose, actions, basket, selectedPositions 
   const [modifyTrigger, setModifyTrigger] = useState("");
   const [positionStopTrigger, setPositionStopTrigger] = useState("");
   const [positionStopLimit, setPositionStopLimit] = useState("");
+  const [positionTakeProfitTrigger, setPositionTakeProfitTrigger] = useState("");
 
   useEffect(() => {
     if (modalState.type === 'modifyOrder' && modalState.data) {
@@ -27,12 +28,15 @@ const ActionModals = ({ modalState, onClose, actions, basket, selectedPositions 
       setPositionStopTrigger("");
       setPositionStopLimit("");
     }
+    if (modalState.type === 'placePositionTakeProfit' && modalState.data) {
+      setPositionTakeProfitTrigger("");
+    }
   }, [modalState]);
 
   const {
     handleConfirmOrder, handleSquareOff, handleBulkSquareOff,
     handleLiquidatePortfolio, handleModifyOrder, handleExecuteBasket,
-    handlePlacePositionStopLoss
+    handlePlacePositionStopLoss, handlePlacePositionTakeProfit
   } = actions;
   
   const isOpen = (type) => modalState.type === type;
@@ -135,6 +139,41 @@ const ActionModals = ({ modalState, onClose, actions, basket, selectedPositions 
             <Button variant="outline" onClick={onClose}>Cancel</Button>
             <Button onClick={() => handlePlacePositionStopLoss({ triggerPrice: positionStopTrigger, limitPrice: positionStopLimit })}>
               Place Stop-Loss
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isOpen('placePositionTakeProfit')} onOpenChange={onClose}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Arm Take-Profit</DialogTitle>
+            <DialogDescription className="text-foreground">
+              Track LTP locally. When the trigger is reached, cancel the matching stop-loss order first, then square off at market.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-4">
+            <p><strong>Instrument:</strong> {modalState.data?.symId}</p>
+            <p><strong>Net Qty:</strong> {modalState.data?.netQty}</p>
+            <p><strong>LTP:</strong> {modalState.data?.ltp ?? "-"}</p>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="position-tp-trigger" className="text-right">Trigger</Label>
+              <Input
+                id="position-tp-trigger"
+                value={positionTakeProfitTrigger}
+                onChange={(e) => setPositionTakeProfitTrigger(e.target.value)}
+                className="col-span-3"
+                placeholder="60"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Long positions trigger when LTP is greater than or equal to TP. Short positions trigger when LTP is less than or equal to TP.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={onClose}>Cancel</Button>
+            <Button onClick={() => handlePlacePositionTakeProfit({ triggerPrice: positionTakeProfitTrigger })}>
+              Arm Take-Profit
             </Button>
           </DialogFooter>
         </DialogContent>
