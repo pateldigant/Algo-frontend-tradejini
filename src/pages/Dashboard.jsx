@@ -94,9 +94,12 @@ function Dashboard() {
   const takeProfitEventsInitializedRef = useRef(false);
   const autoSquareoffInitializedRef = useRef(false);
   const tradingModeRef = useRef(tradingMode);
+  const selectedUnderlyingRef = useRef(selectedUnderlying);
+  const accountFetchInFlightRef = useRef(false);
 
   const { toast } = useToast();
   tradingModeRef.current = tradingMode;
+  selectedUnderlyingRef.current = selectedUnderlying;
 
   const applyOrderbook = useCallback((orders) => {
     if (tradingMode !== tradingModeRef.current) return;
@@ -117,6 +120,19 @@ function Dashboard() {
     setTakeProfitEventsPayloadId((current) => current + 1);
     setTakeProfitEvents(Array.isArray(events) ? events : []);
   }, [tradingMode]);
+
+  const applyAccountState = useCallback((state) => {
+    if (!state) return;
+    setPositions(Array.isArray(state.positions) ? state.positions : []);
+    setFunds({ d: state.funds || {} });
+    applyOrderbook(Array.isArray(state.orderbook) ? state.orderbook : []);
+    setTakeProfitTriggers(state.takeProfitTriggers || {});
+    applyTakeProfitEvents(Array.isArray(state.takeProfitEvents) ? state.takeProfitEvents : []);
+    setDayCharges(state.dayCharges?.d || state.dayCharges || null);
+    if (state.runtimeStatus) {
+      setRuntimeStatus(state.runtimeStatus);
+    }
+  }, [applyOrderbook, applyTakeProfitEvents]);
 
   const playSound = useCallback((type) => {
     const audio = type === "tp" ? tpAudioRef.current : slAudioRef.current;
@@ -160,20 +176,6 @@ function Dashboard() {
     }
   };
 
-  const fetchData = useCallback(async (url, setter) => {
-    try {
-      const modeQuery = url === "latest" ? "" : `?mode=${tradingMode}`;
-      const response = await fetch(`http://localhost:8000/api/${url}${modeQuery}`);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const result = await response.json();
-      if (result.s === "ok") {
-        setter(result.d);
-      }
-    } catch (error) {
-      console.error(`Error fetching ${url}:`, error);
-    }
-  }, [tradingMode]);
-
   const fetchSnapshot = useCallback(async () => {
     try {
       const response = await fetch(`http://localhost:8000/api/latest?underlying=${selectedUnderlying}`);
@@ -186,18 +188,31 @@ function Dashboard() {
     }
   }, [applySnapshotPayload, selectedUnderlying]);
 
-  const fetchRuntimeStatus = useCallback(async () => {
+  const fetchAccountState = useCallback(async () => {
+    if (accountFetchInFlightRef.current) return;
+    accountFetchInFlightRef.current = true;
+    const requestedMode = tradingMode;
+    const requestedUnderlying = selectedUnderlying;
     try {
-      const response = await fetch(`http://localhost:8000/api/runtime-status?underlying=${selectedUnderlying}`);
+      const response = await fetch(`http://localhost:8000/api/account-state?mode=${tradingMode}&underlying=${selectedUnderlying}`);
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const result = await response.json();
-      setRuntimeStatus(result);
+      if (
+        result.s === "ok"
+        && requestedMode === tradingModeRef.current
+        && requestedUnderlying === selectedUnderlyingRef.current
+      ) {
+        applyAccountState(result.d);
+      }
     } catch (error) {
-      console.error("Error fetching runtime status:", error);
+      console.error("Error fetching account state:", error);
+    } finally {
+      accountFetchInFlightRef.current = false;
     }
-  }, [selectedUnderlying]);
+  }, [applyAccountState, selectedUnderlying, tradingMode]);
 
   const postRequest = async (url, body, successMsg, errorMsg) => {
+    let ok = false;
     try {
       const response = await fetch(`http://localhost:8000/api/${url}`, {
         method: "POST",
@@ -205,7 +220,8 @@ function Dashboard() {
         body: JSON.stringify({ ...body, mode: tradingMode }),
       });
       const result = await response.json();
-      if (response.ok) {
+      ok = response.ok;
+      if (ok) {
         toast({ title: "Success", description: result.msg || result.details || successMsg });
       } else {
         toast({ variant: "destructive", title: "Error", description: result.detail || errorMsg });
@@ -214,11 +230,14 @@ function Dashboard() {
       toast({ variant: "destructive", title: "Request Failed", description: errorMsg });
     } finally {
       setModalState({ type: null, data: null });
-      setTimeout(() => {
-        fetchData("enriched-positions", setPositions);
-        fetchData("orderbook", applyOrderbook);
-      }, 500);
+      if (ok) {
+        fetchAccountState();
+        setTimeout(() => {
+          fetchAccountState();
+        }, 1200);
+      }
     }
+    return ok;
   };
 
   const syncSquareoffBeforeClose = useCallback(async ({ showToast = false, warnOnFailure = false } = {}) => {
@@ -341,37 +360,19 @@ function Dashboard() {
   useEffect(() => {
     const initialFetch = () => {
       fetchSnapshot();
-      fetchRuntimeStatus();
-      fetchData("enriched-positions", setPositions);
-      fetchData("funds", (d) => setFunds({ d }));
-      fetchData("orderbook", applyOrderbook);
-      fetchData("take-profit-triggers", setTakeProfitTriggers);
-      fetchData("take-profit-events", applyTakeProfitEvents);
-      fetchData("day-charges", setDayCharges);
+      fetchAccountState();
     };
 
     initialFetch();
 
     const snapshotInterval = !liveSocketConnected ? setInterval(fetchSnapshot, POLLING_INTERVAL_MS) : null;
-    const id2 = setInterval(() => fetchData("enriched-positions", setPositions), POLLING_INTERVAL_MS);
-    const id3 = setInterval(() => fetchData("funds", (d) => setFunds({ d })), POLLING_INTERVAL_MS * 2);
-    const id4 = setInterval(() => fetchData("orderbook", applyOrderbook), POLLING_INTERVAL_MS);
-    const id5 = setInterval(fetchRuntimeStatus, POLLING_INTERVAL_MS * 2);
-    const id6 = setInterval(() => fetchData("day-charges", setDayCharges), POLLING_INTERVAL_MS * 5);
-    const id7 = setInterval(() => fetchData("take-profit-triggers", setTakeProfitTriggers), POLLING_INTERVAL_MS);
-    const id8 = setInterval(() => fetchData("take-profit-events", applyTakeProfitEvents), POLLING_INTERVAL_MS);
+    const accountStateInterval = setInterval(fetchAccountState, POLLING_INTERVAL_MS);
 
     return () => {
       if (snapshotInterval) clearInterval(snapshotInterval);
-      clearInterval(id2);
-      clearInterval(id3);
-      clearInterval(id4);
-      clearInterval(id5);
-      clearInterval(id6);
-      clearInterval(id7);
-      clearInterval(id8);
+      clearInterval(accountStateInterval);
     };
-  }, [applyOrderbook, applyTakeProfitEvents, fetchData, fetchRuntimeStatus, fetchSnapshot, liveSocketConnected]);
+  }, [fetchAccountState, fetchSnapshot, liveSocketConnected]);
 
   useEffect(() => {
     if (orderbookMode !== tradingMode || orderbookPayloadId === 0) return;
@@ -549,23 +550,44 @@ function Dashboard() {
   }, [data, funds, orderLots]);
 
   const handleInitiateOrder = (orderData, lots) => {
-    const tradeLots = lots || 1;
-    const order = { ...orderData, lots: tradeLots, quantity: tradeLots * orderData.lot };
+    const tradeLots = Number(lots) || 1;
+    const lotSize = Number(orderData?.lot);
+    if (!orderData?.symId || !orderData?.side || !Number.isFinite(lotSize) || lotSize <= 0) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Order",
+        description: "The selected option contract is missing symbol or lot details.",
+      });
+      return false;
+    }
+
+    const order = { ...orderData, lot: lotSize, lots: tradeLots, quantity: tradeLots * lotSize };
 
     if (isBasketMode) {
       setBasket((prev) => [...prev, order]);
       toast({ title: "Added to Basket", description: `${order.symId} was added to your order basket.` });
+      return true;
     } else if (isFastMode) {
-      handleConfirmOrder(order);
+      return handleConfirmOrder(order);
     } else {
       setModalState({ type: "confirmOrder", data: order });
+      return true;
     }
   };
 
   const handleConfirmOrder = (order) => {
-    if (!order) return;
+    if (!order) return false;
     const { symId, lot, side, lots } = order;
-    postRequest("place-order", { symId, qty: lots * lot, side }, "Order placed successfully.", "Failed to place order.");
+    const qty = Number(lots) * Number(lot);
+    if (!symId || !side || !Number.isFinite(qty) || qty <= 0) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Order",
+        description: "Order quantity could not be calculated from the selected lots.",
+      });
+      return false;
+    }
+    return postRequest("place-order", { symId, qty, side }, "Order placed successfully.", "Failed to place order.");
   };
 
   const handleSquareOff = (position) => {

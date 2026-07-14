@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { memo, useMemo, useRef, useState } from "react";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -48,6 +48,21 @@ function OptionChainTable({
     return map;
   }, [openOrders]);
 
+  const watchedSymbolSet = useMemo(() => new Set(watchedSymbols), [watchedSymbols]);
+  const [placingOrderKeys, setPlacingOrderKeys] = useState(() => new Set());
+  const placingOrderKeysRef = useRef(new Set());
+
+  const formatPositionLots = (position) => {
+    const netQty = Math.abs(Number(position?.netQty));
+    const lotSize = Number(position?.lot);
+    if (!Number.isFinite(netQty) || !Number.isFinite(lotSize) || lotSize <= 0) {
+      return null;
+    }
+    const lots = netQty / lotSize;
+    if (!Number.isFinite(lots)) return null;
+    return Number.isInteger(lots) ? String(lots) : lots.toFixed(2).replace(/\.?0+$/, "");
+  };
+
   const getLtpClass = (currentLtp, strike, type) => {
     if (currentLtp === null || currentLtp === undefined) return "";
     const prevLtp = type === "CE" ? prevLtpMap.get(strike)?.CE_ltp : prevLtpMap.get(strike)?.PE_ltp;
@@ -83,7 +98,29 @@ function OptionChainTable({
     const prevLtp = prevLtpMap.get(optionData?.strike)?.[`${side}_ltp`];
     const rising = prevLtp !== undefined && prevLtp !== null && ltp > prevLtp;
     const { hasPosition, hasOrder, position } = deriveMarkers(optionData);
-    const isWatched = watchedSymbols.includes(optionData?.symId);
+    const isWatched = watchedSymbolSet.has(optionData?.symId);
+    const positionLots = formatPositionLots(position);
+    const buyOrderKey = `${optionData?.symId || ""}:BUY`;
+    const sellOrderKey = `${optionData?.symId || ""}:SELL`;
+    const isBuying = placingOrderKeys.has(buyOrderKey);
+    const isSelling = placingOrderKeys.has(sellOrderKey);
+
+    const handleTradeClick = async (tradeSide) => {
+      const orderKey = `${optionData.symId}:${tradeSide}`;
+      if (placingOrderKeysRef.current.has(orderKey)) return;
+      placingOrderKeysRef.current.add(orderKey);
+      setPlacingOrderKeys((current) => new Set(current).add(orderKey));
+      try {
+        await onPlaceOrder({ ...optionData, side: tradeSide });
+      } finally {
+        placingOrderKeysRef.current.delete(orderKey);
+        setPlacingOrderKeys((current) => {
+          const next = new Set(current);
+          next.delete(orderKey);
+          return next;
+        });
+      }
+    };
 
     if (!optionData || !optionData.symId) {
       return <TableCell className="text-center text-slate-400">-</TableCell>;
@@ -103,7 +140,7 @@ function OptionChainTable({
             <div className="mt-1 flex flex-wrap gap-1">
               {hasPosition && (
                 <Badge variant="outline" className="border-amber-300 bg-amber-100 text-[10px] text-amber-900">
-                  Pos {position.netQty > 0 ? "Long" : "Short"}
+                  Pos {position.netQty > 0 ? "Long" : "Short"}{positionLots ? ` ${positionLots}L` : ""}
                 </Badge>
               )}
               {hasOrder && (
@@ -114,11 +151,23 @@ function OptionChainTable({
             </div>
           </div>
           <div className="flex shrink-0 gap-1">
-            <Button size="sm" variant="outline" className="h-7 rounded-lg border-emerald-200 px-2 text-emerald-700 hover:bg-emerald-50" onClick={() => onPlaceOrder({ ...optionData, side: "BUY" })}>
-              B
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 rounded-lg border-emerald-200 px-2 text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
+              disabled={isBuying}
+              onClick={() => handleTradeClick("BUY")}
+            >
+              {isBuying ? "..." : "B"}
             </Button>
-            <Button size="sm" variant="outline" className="h-7 rounded-lg border-rose-200 px-2 text-rose-700 hover:bg-rose-50" onClick={() => onPlaceOrder({ ...optionData, side: "SELL" })}>
-              S
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 rounded-lg border-rose-200 px-2 text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+              disabled={isSelling}
+              onClick={() => handleTradeClick("SELL")}
+            >
+              {isSelling ? "..." : "S"}
             </Button>
             <Button
               size="sm"
@@ -218,4 +267,4 @@ function OptionChainTable({
   );
 }
 
-export default OptionChainTable;
+export default memo(OptionChainTable);
