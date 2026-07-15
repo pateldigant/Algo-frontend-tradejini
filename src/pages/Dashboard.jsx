@@ -1,25 +1,16 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useToast } from "@/components/hooks/use-toast";
 
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  ResizablePanelGroup,
-  ResizablePanel,
-  ResizableHandle,
-} from "@/components/ui/resizable";
-
 import OptionChainTable from "@/components/OptionChainTable";
-import FundsDisplay from "@/components/FundsDisplay";
+import TerminalHeader from "@/components/TerminalHeader";
 import OpenOrdersTable from "@/components/OpenOrdersTable";
 import PositionsTable from "@/components/PositionsTable";
 import GlobalControls from "@/components/GlobalControls";
 import StrategyExecutionPanel from "@/components/StrategyExecutionPanel";
 import Basket from "@/components/Basket";
 import ActionModals from "@/components/ActionModals";
-import ScalpMonitor from "@/components/ScalpMonitor";
 
 const POLLING_INTERVAL_MS = 1000;
-const WATCHLIST_STORAGE_KEY = "scalpWatchlists";
 const TAKE_PROFIT_STORAGE_KEY = "positionTakeProfitTriggers";
 const AUTO_SQUAREOFF_STORAGE_KEY = "squareoffBeforeClose";
 const SL_SOUND_PATH = "/sounds/SL.wav";
@@ -70,21 +61,7 @@ function Dashboard() {
       return {};
     }
   });
-  const [scalpWatchlists, setScalpWatchlists] = useState(() => {
-    try {
-      const raw = window.localStorage.getItem(WATCHLIST_STORAGE_KEY);
-      const parsed = raw ? JSON.parse(raw) : {};
-      return {
-        NIFTY: Array.isArray(parsed.NIFTY) ? parsed.NIFTY : [],
-        SENSEX: Array.isArray(parsed.SENSEX) ? parsed.SENSEX : [],
-      };
-    } catch {
-      return { NIFTY: [], SENSEX: [] };
-    }
-  });
-
   const tradingMode = isPaperMode ? "paper" : "real";
-  const selectedWatchlist = scalpWatchlists[selectedUnderlying] || [];
   const slAudioRef = useRef(null);
   const tpAudioRef = useRef(null);
   const audioUnlockedRef = useRef(false);
@@ -350,10 +327,6 @@ function Dashboard() {
   }, [selectedUnderlying]);
 
   useEffect(() => {
-    window.localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(scalpWatchlists));
-  }, [scalpWatchlists]);
-
-  useEffect(() => {
     window.localStorage.setItem(TAKE_PROFIT_STORAGE_KEY, JSON.stringify(takeProfitTriggers));
   }, [takeProfitTriggers]);
 
@@ -479,44 +452,6 @@ function Dashboard() {
       }
     };
   }, [applySnapshotPayload, selectedUnderlying]);
-
-  const updateWatchlist = (updater) => {
-    setScalpWatchlists((current) => {
-      const nextList = updater(current[selectedUnderlying] || []);
-      return {
-        ...current,
-        [selectedUnderlying]: Array.from(new Set(nextList)),
-      };
-    });
-  };
-
-  const toggleWatchSymbol = (symId) => {
-    if (!symId) return;
-    updateWatchlist((current) => (
-      current.includes(symId) ? current.filter((item) => item !== symId) : [...current, symId]
-    ));
-  };
-
-  const removeWatchSymbol = (symId) => {
-    updateWatchlist((current) => current.filter((item) => item !== symId));
-  };
-
-  const addWatchSymbols = (symIds) => {
-    const valid = symIds.filter(Boolean);
-    if (!valid.length) return;
-    updateWatchlist((current) => [...current, ...valid]);
-  };
-
-  const atmWatchTargets = useMemo(() => {
-    if (!data?.option_chain || !data?.atm_strike) {
-      return { ce: null, pe: null };
-    }
-    const atmRow = data.option_chain.find((row) => row.strike === data.atm_strike);
-    return {
-      ce: atmRow?.CE?.symId || null,
-      pe: atmRow?.PE?.symId || null,
-    };
-  }, [data]);
 
   const scalpBuyingPower = useMemo(() => {
     const atmRow = data?.option_chain?.find((row) => row.strike === data?.atm_strike);
@@ -772,45 +707,6 @@ function Dashboard() {
     return map;
   }, [data]);
 
-  const optionLookup = useMemo(() => {
-    const map = new Map();
-    for (const row of data?.option_chain || []) {
-      if (row.CE?.symId) {
-        map.set(row.CE.symId, { ...row.CE, strike: row.strike, optionType: "CE" });
-      }
-      if (row.PE?.symId) {
-        map.set(row.PE.symId, { ...row.PE, strike: row.strike, optionType: "PE" });
-      }
-    }
-    return map;
-  }, [data]);
-
-  const optionContracts = useMemo(() => {
-    const atmStrike = data?.atm_strike;
-    const strikeInterval = data?.strike_interval;
-    const maxDistance = Number.isFinite(atmStrike) && Number.isFinite(strikeInterval)
-      ? strikeInterval * 20
-      : null;
-    const items = [];
-    for (const row of data?.option_chain || []) {
-      if (maxDistance !== null && Math.abs((row?.strike ?? 0) - atmStrike) > maxDistance) {
-        continue;
-      }
-      if (row.CE?.symId) {
-        items.push({ ...row.CE, symId: row.CE.symId, strike: row.strike, optionType: "CE" });
-      }
-      if (row.PE?.symId) {
-        items.push({ ...row.PE, symId: row.PE.symId, strike: row.strike, optionType: "PE" });
-      }
-    }
-    return items.sort((a, b) => {
-      if (a.strike === b.strike) {
-        return a.optionType.localeCompare(b.optionType);
-      }
-      return a.strike - b.strike;
-    });
-  }, [data]);
-
   const livePositions = useMemo(() => {
     return positions.map((position) => {
       const liveLtp = optionChainLtpMap.get(position.symId);
@@ -872,13 +768,14 @@ function Dashboard() {
   }, [livePositions, tradingMode]);
 
   return (
-    <div className="space-y-6">
-      <FundsDisplay
+    <div className="terminal-app-shell">
+      <TerminalHeader
         funds={funds}
         runtimeStatus={runtimeStatus}
         tradingMode={tradingMode}
         selectedUnderlying={selectedUnderlying}
         dayCharges={dayCharges}
+        positions={livePositions}
       />
 
       <GlobalControls
@@ -898,102 +795,70 @@ function Dashboard() {
         setSelectedUnderlying={setSelectedUnderlying}
       />
 
-      <ResizablePanelGroup
-        direction="horizontal"
-        className="min-h-[980px] rounded-[28px] border border-slate-200/80 bg-white/70 shadow-[0_18px_50px_rgba(15,23,42,0.06)] backdrop-blur-xl"
-      >
-        <ResizablePanel defaultSize={58}>
-          <div className="flex h-full flex-col gap-6 p-4">
-            <PositionsTable
-              positions={displayedPositions}
-              allPositions={livePositions}
-              openOrders={openOrders}
-              tradingMode={tradingMode}
-              showOnlyActive={showOnlyActive}
-              setShowOnlyActive={setShowOnlyActive}
-              positionLots={positionLots}
-              setPositionLots={setPositionLots}
-              selectedPositions={selectedPositions}
-              setSelectedPositions={setSelectedPositions}
-              onPlaceOrder={handleInitiateOrder}
-              onExit={(position) => {
-                if (isFastMode) {
-                  handleSquareOff(position);
-                } else {
-                  setModalState({ type: "confirmSquareOff", data: position });
-                }
-              }}
-              onExitSelected={() => setModalState({ type: "confirmBulkSquareOff", data: null })}
-              onExitAll={() => {
-                if (isFastMode) {
-                  handleLiquidatePortfolio();
-                } else {
-                  setModalState({ type: "confirmLiquidate", data: null });
-                }
-              }}
-              onPlaceStopLoss={(position) => setModalState({ type: "placePositionStopLoss", data: { ...position, mode: tradingMode } })}
-              onPlaceTakeProfit={(position) => setModalState({ type: "placePositionTakeProfit", data: { ...position, mode: tradingMode } })}
-              takeProfitTriggers={takeProfitTriggers}
-            />
-            <OpenOrdersTable
-              orders={openOrders}
-              onModify={(order) => setModalState({ type: "modifyOrder", data: order })}
-              onCancel={handleCancelOrder}
-            />
-            <ScalpMonitor
+      <div className="terminal-workspace">
+        <aside className="terminal-left-rail">
+          <StrategyExecutionPanel
+            orderLots={orderLots}
+            selectedUnderlying={selectedUnderlying}
+            scalpBuyingPower={scalpBuyingPower}
+            onExecute={handleExecuteStrategy}
+          />
+        </aside>
+
+        <main className="terminal-chain-workspace">
+          {data?.option_chain ? (
+            <OptionChainTable
+              optionChain={data.option_chain}
+              spotPrice={data.spot_price}
+              atmStrike={data.atm_strike}
+              strikeInterval={data.strike_interval}
               underlying={selectedUnderlying}
-              spotPrice={data?.spot_price}
-              watchedSymbols={selectedWatchlist}
-              optionLookup={optionLookup}
-              optionContracts={optionContracts}
-              onRemoveSymbol={removeWatchSymbol}
-              onPlaceOrder={handleInitiateOrder}
-              onAddSymbol={(symId) => addWatchSymbols([symId])}
-              onAddAtmCall={() => addWatchSymbols([atmWatchTargets.ce])}
-              onAddAtmPut={() => addWatchSymbols([atmWatchTargets.pe])}
-              onAddAtmPair={() => addWatchSymbols([atmWatchTargets.ce, atmWatchTargets.pe])}
+              prevOptionChain={prevData?.option_chain}
+              strikeRange={strikeRange}
+              positions={filteredPositions}
+              openOrders={filteredOpenOrders}
+              onPlaceOrder={(orderData) => handleInitiateOrder(orderData, orderLots)}
             />
-          </div>
-        </ResizablePanel>
+          ) : (
+            <div className="terminal-loading">Loading {selectedUnderlying} option chain...</div>
+          )}
+        </main>
+      </div>
 
-        <ResizableHandle withHandle />
-
-        <ResizablePanel defaultSize={42}>
-          <div className="flex h-full flex-col gap-6 p-4">
-            <StrategyExecutionPanel
-              orderLots={orderLots}
-              selectedUnderlying={selectedUnderlying}
-              scalpBuyingPower={scalpBuyingPower}
-              onExecute={handleExecuteStrategy}
-            />
-
-            <Card className="terminal-shell flex-1 border-0">
-              <CardContent className="h-full p-2">
-                {data && data.option_chain ? (
-                  <OptionChainTable
-                    optionChain={data.option_chain}
-                    spotPrice={data.spot_price}
-                    atmStrike={data.atm_strike}
-                    strikeInterval={data.strike_interval}
-                    underlying={selectedUnderlying}
-                    prevOptionChain={prevData?.option_chain}
-                    strikeRange={strikeRange}
-                    positions={filteredPositions}
-                    openOrders={filteredOpenOrders}
-                    watchedSymbols={selectedWatchlist}
-                    onToggleWatch={toggleWatchSymbol}
-                    onPlaceOrder={(orderData) => handleInitiateOrder(orderData, orderLots)}
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center p-10 text-muted-foreground">
-                    Loading {selectedUnderlying} option chain...
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </ResizablePanel>
-      </ResizablePanelGroup>
+      <section className="terminal-activity-dock">
+        <div className="terminal-activity-grid">
+          <PositionsTable
+            positions={displayedPositions}
+            allPositions={livePositions}
+            openOrders={openOrders}
+            tradingMode={tradingMode}
+            showOnlyActive={showOnlyActive}
+            setShowOnlyActive={setShowOnlyActive}
+            positionLots={positionLots}
+            setPositionLots={setPositionLots}
+            selectedPositions={selectedPositions}
+            setSelectedPositions={setSelectedPositions}
+            onPlaceOrder={handleInitiateOrder}
+            onExit={(position) => {
+              if (isFastMode) handleSquareOff(position);
+              else setModalState({ type: "confirmSquareOff", data: position });
+            }}
+            onExitSelected={() => setModalState({ type: "confirmBulkSquareOff", data: null })}
+            onExitAll={() => {
+              if (isFastMode) handleLiquidatePortfolio();
+              else setModalState({ type: "confirmLiquidate", data: null });
+            }}
+            onPlaceStopLoss={(position) => setModalState({ type: "placePositionStopLoss", data: { ...position, mode: tradingMode } })}
+            onPlaceTakeProfit={(position) => setModalState({ type: "placePositionTakeProfit", data: { ...position, mode: tradingMode } })}
+            takeProfitTriggers={takeProfitTriggers}
+          />
+          <OpenOrdersTable
+            orders={openOrders}
+            onModify={(order) => setModalState({ type: "modifyOrder", data: order })}
+            onCancel={handleCancelOrder}
+          />
+        </div>
+      </section>
 
       {isBasketMode && basket.length > 0 && (
         <Basket

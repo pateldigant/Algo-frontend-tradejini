@@ -1,44 +1,19 @@
 import React from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import { Separator } from "@/components/ui/separator";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlarmClock, ShoppingCart, Zap, Hash, Target, FileText, ChartCandlestick } from "lucide-react";
+import { AlarmClock, FileText, Hash, Layers3, ShoppingCart, Target, Zap } from "lucide-react";
 
-const modeCards = [
-  {
-    key: "basket",
-    label: "Basket Mode",
-    icon: ShoppingCart,
-    activeClasses: "border-sky-300 bg-sky-50 text-sky-800",
-    inactiveClasses: "border-slate-200 bg-white text-slate-600",
-  },
-  {
-    key: "paper",
-    label: "Paper Mode",
-    icon: FileText,
-    activeClasses: "border-emerald-300 bg-emerald-50 text-emerald-800",
-    inactiveClasses: "border-slate-200 bg-white text-slate-600",
-  },
-  {
-    key: "fast",
-    label: "Fast Mode",
-    icon: Zap,
-    activeClasses: "border-amber-300 bg-amber-50 text-amber-800",
-    inactiveClasses: "border-slate-200 bg-white text-slate-600",
-  },
-  {
-    key: "autoSquareoff",
-    label: "Auto Squareoff",
-    icon: AlarmClock,
-    activeClasses: "border-rose-300 bg-rose-50 text-rose-800",
-    inactiveClasses: "border-slate-200 bg-white text-slate-600",
-  },
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+
+const modeControls = [
+  { key: "basket", label: "Basket", icon: ShoppingCart },
+  { key: "paper", label: "Paper", icon: FileText },
+  { key: "fast", label: "Fast mode", icon: Zap },
+  { key: "autoSquareoff", label: "Auto squareoff", icon: AlarmClock },
 ];
 
-const GlobalControls = ({
+function GlobalControls({
   orderLots,
   setOrderLots,
   strikeRange,
@@ -53,117 +28,75 @@ const GlobalControls = ({
   setIsSquareoffBeforeCloseEnabled,
   selectedUnderlying,
   setSelectedUnderlying,
-}) => {
+}) {
+  const values = {
+    basket: isBasketMode,
+    paper: isPaperMode,
+    fast: isFastMode,
+    autoSquareoff: isSquareoffBeforeCloseEnabled,
+  };
+  const setters = {
+    basket: setIsBasketMode,
+    paper: setIsPaperMode,
+    fast: setIsFastMode,
+    autoSquareoff: setIsSquareoffBeforeCloseEnabled,
+  };
+
   return (
-    <Card className="terminal-shell border-0">
-      <CardContent className="p-5">
-        <div className="grid gap-5 xl:grid-cols-[1.1fr_auto_1fr] xl:items-center">
-          <div className="grid gap-4 md:grid-cols-[220px_200px_1fr]">
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-              <div className="mb-2 flex items-center gap-2 text-slate-700">
-                <ChartCandlestick className="h-4 w-4" />
-                <p className="terminal-section-title">Underlying</p>
-              </div>
-              <Select value={selectedUnderlying} onValueChange={setSelectedUnderlying}>
-                <SelectTrigger className="terminal-metric h-11 rounded-xl border-slate-300 font-semibold focus:ring-sky-500">
-                  <SelectValue placeholder="Select underlying" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="NIFTY">NIFTY</SelectItem>
-                  <SelectItem value="SENSEX">SENSEX</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+    <section className="terminal-controlbar" aria-label="Trade controls">
+      <div className="terminal-control-group">
+        <Layers3 className="h-4 w-4 text-sky-600" aria-hidden="true" />
+        <Label htmlFor="underlying">Underlying</Label>
+        <Select value={selectedUnderlying} onValueChange={setSelectedUnderlying}>
+          <SelectTrigger id="underlying" className="terminal-select terminal-metric">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="NIFTY">NIFTY</SelectItem>
+            <SelectItem value="SENSEX">SENSEX</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-              <div className="mb-2 flex items-center gap-2 text-slate-700">
-                <Hash className="h-4 w-4" />
-                <p className="terminal-section-title">Trade Lots</p>
-              </div>
-              <Input
-                id="trade-lots"
-                type="number"
-                min="1"
-                value={orderLots}
-                onChange={(e) => setOrderLots(Number(e.target.value))}
-                className="terminal-metric h-11 border-slate-300 text-center text-lg font-semibold focus-visible:ring-sky-500"
-              />
-            </div>
+      <div className="terminal-control-group">
+        <Hash className="h-4 w-4 text-slate-500" aria-hidden="true" />
+        <Label htmlFor="trade-lots">Lots</Label>
+        <Input
+          id="trade-lots"
+          type="number"
+          min="1"
+          value={orderLots}
+          onChange={(event) => setOrderLots(Math.max(1, Number(event.target.value) || 1))}
+          className="terminal-number-input terminal-metric"
+        />
+      </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-              <div className="mb-2 flex items-center gap-2 text-slate-700">
-                <Target className="h-4 w-4" />
-                <p className="terminal-section-title">Visible Chain Window</p>
-              </div>
-              <div className="flex items-center gap-4">
-                <Input
-                  id="strike-range"
-                  type="range"
-                  min={5}
-                  max={50}
-                  step={5}
-                  value={strikeRange}
-                  onChange={(e) => setStrikeRange(Number(e.target.value))}
-                  className="cursor-pointer"
-                />
-                <div className="terminal-metric min-w-[82px] rounded-full bg-slate-100 px-3 py-2 text-center text-sm font-semibold text-slate-700">
-                  ATM ±{strikeRange}
-                </div>
-              </div>
-            </div>
+      <div className="terminal-control-group">
+        <Target className="h-4 w-4 text-slate-500" aria-hidden="true" />
+        <Label htmlFor="chain-window">Chain</Label>
+        <Select value={String(strikeRange)} onValueChange={(value) => setStrikeRange(Number(value))}>
+          <SelectTrigger id="chain-window" className="terminal-select terminal-metric">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {[5, 10, 15, 20, 30, 50].map((range) => (
+              <SelectItem key={range} value={String(range)}>ATM +/- {range}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="terminal-mode-controls">
+        {modeControls.map(({ key, label, icon: Icon }) => (
+          <div key={key} className={`terminal-mode-control ${values[key] ? "is-active" : ""}`}>
+            {React.createElement(Icon, { "aria-hidden": true })}
+            <Label htmlFor={`${key}-mode`}>{label}</Label>
+            <Switch id={`${key}-mode`} checked={values[key]} onCheckedChange={setters[key]} />
           </div>
-
-          <Separator orientation="vertical" className="hidden h-16 bg-slate-300 xl:block" />
-
-          <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
-            {modeCards.map((card) => {
-              const isActive =
-                (card.key === "basket" && isBasketMode) ||
-                (card.key === "paper" && isPaperMode) ||
-                (card.key === "fast" && isFastMode) ||
-                (card.key === "autoSquareoff" && isSquareoffBeforeCloseEnabled);
-              const Icon = card.icon;
-              const checked = card.key === "basket"
-                ? isBasketMode
-                : card.key === "paper"
-                  ? isPaperMode
-                  : card.key === "fast"
-                    ? isFastMode
-                    : isSquareoffBeforeCloseEnabled;
-              const onCheckedChange = card.key === "basket"
-                ? setIsBasketMode
-                : card.key === "paper"
-                  ? setIsPaperMode
-                  : card.key === "fast"
-                    ? setIsFastMode
-                    : setIsSquareoffBeforeCloseEnabled;
-
-              return (
-                <div
-                  key={card.key}
-                  className={`rounded-2xl border px-4 py-3 shadow-sm transition-all ${isActive ? card.activeClasses : card.inactiveClasses}`}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className={`rounded-xl p-2 ${isActive ? "bg-white/70" : "bg-slate-100"}`}>
-                        <Icon className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <Label htmlFor={`${card.key}-mode`} className="text-sm font-semibold cursor-pointer">
-                          {card.label}
-                        </Label>
-                      </div>
-                    </div>
-                    <Switch id={`${card.key}-mode`} checked={checked} onCheckedChange={onCheckedChange} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+        ))}
+      </div>
+    </section>
   );
-};
+}
 
 export default GlobalControls;

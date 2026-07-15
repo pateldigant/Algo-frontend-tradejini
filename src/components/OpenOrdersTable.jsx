@@ -1,83 +1,44 @@
 import React from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+import { Edit3, X } from "lucide-react";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Edit, XCircle } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
+const formatNumber = (value) => Number.isFinite(Number(value)) ? Number(value).toFixed(2) : "-";
 
 function OpenOrdersTable({ orders, onCancel, onModify }) {
-  const getStatusBadge = (status) => {
-    switch (status?.toLowerCase()) {
-      case "open": return <Badge>OPEN</Badge>;
-      case "trigger_pending": return <Badge variant="secondary">TRIGGER PENDING</Badge>;
-      default: return <Badge variant="outline">{status}</Badge>;
-    }
-  };
-
   return (
-    <Card className="terminal-shell border-0">
-      <CardHeader className="border-b border-slate-200/80 pb-4">
-        <CardTitle className="text-xl font-bold text-slate-800">
-          Open Orders
-          <span className="ml-2 rounded-full bg-violet-100 px-2 py-1 text-sm font-normal text-violet-700">
-            {orders.length}
-          </span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="p-0">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-slate-50/80">
-              <TableHead className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Symbol</TableHead>
-              <TableHead className="text-center text-[11px] uppercase tracking-[0.18em] text-slate-500">Qty</TableHead>
-              <TableHead className="text-center text-[11px] uppercase tracking-[0.18em] text-slate-500">Side</TableHead>
-              <TableHead className="text-center text-[11px] uppercase tracking-[0.18em] text-slate-500">Type</TableHead>
-              <TableHead className="text-center text-[11px] uppercase tracking-[0.18em] text-slate-500">Price</TableHead>
-              <TableHead className="text-center text-[11px] uppercase tracking-[0.18em] text-slate-500">Trigger</TableHead>
-              <TableHead className="text-center text-[11px] uppercase tracking-[0.18em] text-slate-500">Status</TableHead>
-              <TableHead className="text-center text-[11px] uppercase tracking-[0.18em] text-slate-500">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
+    <section className="activity-panel orders-panel">
+      <div className="activity-toolbar">
+        <div className="activity-title"><strong>Open orders</strong><span>{orders.length}</span></div>
+      </div>
+      <div className="activity-table-scroll">
+        <Table className="orders-table min-w-[660px]">
+          <TableHeader><TableRow>
+            <TableHead>Symbol</TableHead><TableHead>Qty</TableHead><TableHead>Side</TableHead>
+            <TableHead>Type</TableHead><TableHead>Price</TableHead><TableHead>Trigger</TableHead>
+            <TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead>
+          </TableRow></TableHeader>
           <TableBody>
-            {orders.length > 0 ? (
-              orders.map((order) => (
-                <TableRow key={order.orderId}>
-                  <TableCell className="font-medium text-slate-800">{order.symId}</TableCell>
-                  <TableCell className="terminal-metric text-center">{order.qty}</TableCell>
-                  <TableCell className={`text-center font-bold ${order.side?.toLowerCase() === 'buy' ? 'text-green-600' : 'text-red-600'}`}>
-                    {order.side?.toUpperCase()}
-                  </TableCell>
-                  <TableCell className="text-center text-xs font-semibold text-muted-foreground">
-                    {order.type?.toUpperCase() || 'MARKET'}
-                  </TableCell>
-                  <TableCell className="terminal-metric text-center">{order.limitPrice > 0 ? order.limitPrice.toFixed(2) : "-"}</TableCell>
-                  <TableCell className="terminal-metric text-center">{order.trigPrice > 0 ? order.trigPrice.toFixed(2) : "-"}</TableCell>
-                  <TableCell className="text-center">{getStatusBadge(order.status)}</TableCell>
-                  <TableCell className="text-center">
-                    <div className="flex justify-center gap-2">
-                      <Button variant="outline" size="sm" className="rounded-lg" onClick={() => onModify(order)}>
-                        <Edit className="h-4 w-4 mr-1" /> Modify
-                      </Button>
-                      <Button variant="destructive" size="sm" className="rounded-lg" onClick={() => onCancel(order.orderId)}>
-                        <XCircle className="h-4 w-4 mr-1" /> Cancel
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan="8" className="h-24 text-center text-slate-500">
-                  No open orders.
-                </TableCell>
+            {orders.length ? orders.map((order) => (
+              <TableRow key={order.orderId}>
+                <TableCell className="font-medium">{order.symId}</TableCell>
+                <TableCell className="terminal-metric">{order.qty}</TableCell>
+                <TableCell><Badge variant="outline" className={order.side === "BUY" ? "long-badge" : "short-badge"}>{order.side}</Badge></TableCell>
+                <TableCell>{order.type}</TableCell><TableCell className="terminal-metric">{formatNumber(order.price)}</TableCell>
+                <TableCell className="terminal-metric">{Number(order.trigPrice) > 0 ? formatNumber(order.trigPrice) : "-"}</TableCell>
+                <TableCell><Badge variant="secondary">{String(order.status || "").replaceAll("_", " ")}</Badge></TableCell>
+                <TableCell className="text-right"><div className="order-row-actions">
+                  <Button variant="ghost" size="icon" title="Modify order" onClick={() => onModify(order)}><Edit3 aria-hidden="true" /></Button>
+                  <Button variant="ghost" size="icon" title="Cancel order" className="text-rose-600" onClick={() => onCancel(order.orderId)}><X aria-hidden="true" /></Button>
+                </div></TableCell>
               </TableRow>
-            )}
+            )) : <TableRow><TableCell colSpan="8" className="h-20 text-center text-slate-500">No open orders.</TableCell></TableRow>}
           </TableBody>
         </Table>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }
 
