@@ -13,6 +13,8 @@ import ActionModals from "@/components/ActionModals";
 const POLLING_INTERVAL_MS = 1000;
 const TAKE_PROFIT_STORAGE_KEY = "positionTakeProfitTriggers";
 const AUTO_SQUAREOFF_STORAGE_KEY = "squareoffBeforeClose";
+const HOTKEY_SETTINGS_STORAGE_KEY = "terminalHotkeySettings";
+const DEFAULT_HOTKEY_SETTINGS = { enabled: false, exitAll: "X" };
 const SL_SOUND_PATH = "/sounds/SL.wav";
 const TP_SOUND_PATH = "/sounds/TP.wav";
 
@@ -52,6 +54,18 @@ function Dashboard() {
   const [basket, setBasket] = useState([]);
   const [showOnlyActive, setShowOnlyActive] = useState(true);
   const [liveSocketConnected, setLiveSocketConnected] = useState(false);
+  const [hotkeySettings, setHotkeySettings] = useState(() => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(HOTKEY_SETTINGS_STORAGE_KEY) || "null");
+      const savedExitAll = typeof saved?.exitAll === "string" ? saved.exitAll : DEFAULT_HOTKEY_SETTINGS.exitAll;
+      return {
+        enabled: Boolean(saved?.enabled),
+        exitAll: savedExitAll.slice(0, 1).toUpperCase(),
+      };
+    } catch {
+      return DEFAULT_HOTKEY_SETTINGS;
+    }
+  });
   const [takeProfitTriggers, setTakeProfitTriggers] = useState(() => {
     try {
       const raw = window.localStorage.getItem(TAKE_PROFIT_STORAGE_KEY);
@@ -73,6 +87,7 @@ function Dashboard() {
   const tradingModeRef = useRef(tradingMode);
   const selectedUnderlyingRef = useRef(selectedUnderlying);
   const accountFetchInFlightRef = useRef(false);
+  const exitAllHotkeyActionRef = useRef(null);
 
   const { toast } = useToast();
   tradingModeRef.current = tradingMode;
@@ -329,6 +344,10 @@ function Dashboard() {
   useEffect(() => {
     window.localStorage.setItem(TAKE_PROFIT_STORAGE_KEY, JSON.stringify(takeProfitTriggers));
   }, [takeProfitTriggers]);
+
+  useEffect(() => {
+    window.localStorage.setItem(HOTKEY_SETTINGS_STORAGE_KEY, JSON.stringify(hotkeySettings));
+  }, [hotkeySettings]);
 
   useEffect(() => {
     const initialFetch = () => {
@@ -746,6 +765,52 @@ function Dashboard() {
     return showOnlyActive ? livePositions.filter((p) => p.netQty !== 0) : livePositions;
   }, [livePositions, showOnlyActive]);
 
+  exitAllHotkeyActionRef.current = () => {
+    const hasActivePositions = livePositions.some((position) => (position?.netQty ?? 0) !== 0);
+    if (!hasActivePositions && openOrders.length === 0) {
+      toast({ variant: "destructive", title: "No Positions", description: `No ${selectedUnderlying} positions are available to exit.` });
+      return;
+    }
+    if (isFastMode) handleLiquidatePortfolio();
+    else setModalState({ type: "confirmLiquidate", data: null });
+  };
+
+  useEffect(() => {
+    const configuredKey = String(hotkeySettings.exitAll || "").toUpperCase();
+    if (!hotkeySettings.enabled || !configuredKey) return undefined;
+
+    const handleHotkey = (event) => {
+      const target = event.target;
+      const isEditableTarget = target instanceof HTMLElement && (
+        target.isContentEditable
+        || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)
+        || Boolean(target.closest('[role="textbox"], [role="combobox"]'))
+      );
+      const blockingPopupIsOpen = Boolean(document.querySelector(
+        '[role="dialog"], [role="alertdialog"], [role="listbox"], [role="menu"]',
+      ));
+
+      if (
+        event.defaultPrevented
+        || event.repeat
+        || event.ctrlKey
+        || event.metaKey
+        || event.altKey
+        || isEditableTarget
+        || blockingPopupIsOpen
+        || String(event.key || "").toUpperCase() !== configuredKey
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      exitAllHotkeyActionRef.current?.();
+    };
+
+    window.addEventListener("keydown", handleHotkey);
+    return () => window.removeEventListener("keydown", handleHotkey);
+  }, [hotkeySettings.enabled, hotkeySettings.exitAll]);
+
   useEffect(() => {
     const flatSymbols = new Set(
       livePositions
@@ -772,10 +837,13 @@ function Dashboard() {
       <TerminalHeader
         funds={funds}
         runtimeStatus={runtimeStatus}
+        spotPrice={data?.spot_price}
         tradingMode={tradingMode}
         selectedUnderlying={selectedUnderlying}
         dayCharges={dayCharges}
         positions={livePositions}
+        hotkeySettings={hotkeySettings}
+        onHotkeySettingsChange={setHotkeySettings}
       />
 
       <GlobalControls
